@@ -1,0 +1,32 @@
+﻿{
+  "done": false,
+  "task": {
+    "id": "8a246994-f159-4a80-af49-895fde534e30",
+    "ref": "proyek-enterprise/manajemen-proyek/buat-skema-database-dan-migrasi-proyek-jenis",
+    "title": "Buat skema database dan migrasi proyek & jenis",
+    "status": "todo",
+    "featureId": "77c5449d-28f8-48b4-b4e7-16e5afa85681",
+    "feature": "Manajemen Proyek",
+    "plan": {
+      "title": "Proyek Enterprise",
+      "idea": "aplikasi dashboard untuk tracking atau manajemen proyek mana saja yang dikerjakan oleh tiap anggota di divisi Enterprise Jaya Survei Indonesia, Dashboard bisa diisi oleh masing2 akun dan juga bisa mendapatkan notifikasi atau pengingat mengenai project mana yg perlu di follow up, tambahkan juga fitur untuk mengidentifikasi project mana yang paling prioritas sehingga bisa melakukan fokus untuk menyelesaikan hal tersebut",
+      "language": "id",
+      "techStack": {
+        "backend": "ai-pilih",
+        "database": "ai-pilih",
+        "frontend": "ai-pilih",
+        "deployment": "ai-pilih"
+      }
+    }
+  },
+  "progress": {
+    "phase": {
+      "current": 2,
+      "total": 4
+    },
+    "layer": "backend",
+    "page": "Manajemen Proyek",
+    "remainingInPage": 3,
+    "remainingInLayer": 8
+  }
+}

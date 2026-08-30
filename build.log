@@ -1,0 +1,586 @@
+﻿▲ Next.js 16.3.3 (Turbopack)
+node.exe : ⚠ Warning: Next.js ignored package-lock.json in C:\Users\jayas because it would include your home directory 
+(C:\Users\jayas).
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (⚠ Warning: Next...:\Users\jayas).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ To use this directory, set `turbopack.root` in your Next.js config.
+
+✓ Running next.config.ts took 21ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 9.9s
+  Running TypeScript ...
+  Finished TypeScript in 1855ms ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/11) ...
+  Generating static pages using 15 workers (2/11) 
+  Generating static pages using 15 workers (5/11) 
+  Generating static pages using 15 workers (8/11) 
+✓ Generating static pages using 15 workers (11/11) in 640ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/projects
+├ ƒ /api/projects/filters
+├ ƒ /api/projects/overlap
+├ ƒ /api/projects/summary
+├ ƒ /api/projects/timeline
+├ ƒ /proyek
+├ ƒ /proyek/[id]
+├ ○ /proyek/baru
+├ ƒ /proyek/jenis
+└ ○ /timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.agents\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.augment\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.claude\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codebuddy\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.codewhale\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.continue\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.cursor\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.factory\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.gemini\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.github\prompts\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kilocode\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.kiro\steering\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.opencode\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.qoder\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.roo\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.trae\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.warp\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\brand\scripts\extract-colors.cjs
+  21:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  22:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\brand\scripts\inject-brand-context.cjs
+  15:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  16:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\brand\scripts\sync-brand-to-tokens.cjs
+  12:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  13:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:26  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\brand\scripts\validate-asset.cjs
+  16:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  17:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\design-system\scripts\embed-tokens.cjs
+  13:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  14:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\design-system\scripts\generate-tokens.cjs
+   10:12  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+   11:14  error    A `require()` style import is forbidden     @typescript-eslint/no-require-imports
+  148:20  warning  'value' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\jayas\Downloads\HARIR\App_Dev\Dashboard_Enterprise\.windsurf\skills\design-system\scripts\validate-tokens.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  12:14  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+✖ 288 problems (270 errors, 18 warnings)
+

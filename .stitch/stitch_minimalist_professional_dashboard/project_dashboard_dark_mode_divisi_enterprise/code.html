@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Divisi Enterprise - Project Tracking Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "tertiary": "#b9c8de",
+                "on-background": "#dae2fd",
+                "background": "#0b1326",
+                "status-low": "#4ade80",
+                "surface-bright": "#31394d",
+                "primary-container": "#1e293b",
+                "inverse-on-surface": "#283044",
+                "on-primary-fixed-variant": "#3c475a",
+                "tertiary-fixed": "#d4e4fa",
+                "error-container": "#93000a",
+                "on-primary-fixed": "#111c2d",
+                "status-medium": "#fbbf24",
+                "surface-container-highest": "#2d3449",
+                "surface-container-high": "#222a3d",
+                "surface-tint": "#bcc7de",
+                "on-surface-bright": "#f8fafc",
+                "on-secondary-fixed-variant": "#004c6e",
+                "border-low-opacity": "rgba(226, 232, 240, 0.1)",
+                "secondary-fixed": "#c9e6ff",
+                "on-tertiary-fixed-variant": "#39485a",
+                "on-primary-container": "#8590a6",
+                "on-surface-muted": "#94a3b8",
+                "secondary": "#89ceff",
+                "on-secondary-fixed": "#001e2f",
+                "inverse-surface": "#dae2fd",
+                "on-primary": "#263143",
+                "surface-charcoal": "#0f172a",
+                "on-secondary": "#00344d",
+                "outline-variant": "#45474c",
+                "secondary-fixed-dim": "#89ceff",
+                "surface-dim": "#0b1326",
+                "primary-fixed": "#d8e3fb",
+                "primary-fixed-dim": "#bcc7de",
+                "primary": "#bcc7de",
+                "on-surface-variant": "#c5c6cd",
+                "surface-container": "#171f33",
+                "inverse-primary": "#545f73",
+                "on-tertiary": "#233143",
+                "surface-slate": "#1e293b",
+                "tertiary-fixed-dim": "#b9c8de",
+                "on-error": "#690005",
+                "on-secondary-container": "#00344e",
+                "tertiary-container": "#1b2a3b",
+                "surface-container-low": "#131b2e",
+                "error": "#ffb4ab",
+                "outline": "#8f9097",
+                "surface": "#0b1326",
+                "on-tertiary-container": "#8291a6",
+                "status-high": "#fb7185",
+                "on-surface": "#dae2fd",
+                "on-error-container": "#ffdad6",
+                "on-tertiary-fixed": "#0d1c2d",
+                "surface-container-lowest": "#060e20",
+                "secondary-container": "#00a2e6",
+                "surface-variant": "#2d3449"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "card-padding": "1.25rem",
+                "page-margin": "2rem",
+                "gutter": "1rem",
+                "section-gap": "1.5rem",
+                "element-gap": "0.5rem"
+        },
+        "fontFamily": {
+                "body-md": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "headline-sm": [
+                        "Inter"
+                ],
+                "label-md": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "headline-md": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "1.5",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "1.6",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-sm": [
+                        "18px",
+                        {
+                                "lineHeight": "1.4",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-md": [
+                        "12px",
+                        {
+                                "lineHeight": "1",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "1.2",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "1.2",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "1.3",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-caps": [
+                        "11px",
+                        {
+                                "lineHeight": "1",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased h-screen overflow-hidden flex dark">
+<!-- SideNavBar -->
+<aside class="bg-surface-container-lowest fixed left-0 top-0 h-full w-[280px] border-r border-border-low-opacity shadow-sm flex flex-col py-section-gap px-gutter z-50">
+<div class="mb-section-gap flex items-center gap-3 px-4">
+<div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg">
+                DE
+            </div>
+<div>
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-surface">Divisi Enterprise</h1>
+<p class="font-label-md text-label-md text-on-surface-variant mt-1">Enterprise Division</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="bg-surface-container text-primary font-semibold border-r-4 border-primary flex items-center gap-3 px-4 py-3 rounded-l-lg transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined icon-fill">dashboard</span>
+<span class="font-body-md text-body-md">Overview</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container transition-colors flex items-center gap-3 px-4 py-3 rounded-lg duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-body-md text-body-md">Projects</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container transition-colors flex items-center gap-3 px-4 py-3 rounded-lg duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-body-md">Team</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container transition-colors flex items-center gap-3 px-4 py-3 rounded-lg duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-body-md text-body-md">Notifications</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-container transition-colors flex items-center gap-3 px-4 py-3 rounded-lg duration-200 ease-in-out mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-[280px] w-[calc(100%-280px)] h-full flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest/90 backdrop-blur-md fixed top-0 right-0 w-[calc(100%-280px)] h-16 border-b border-border-low-opacity flex justify-between items-center px-page-margin z-40">
+<div class="flex items-center w-96 relative">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container border border-border-low-opacity rounded-lg text-body-md focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all text-on-surface" placeholder="Search projects, tasks, or team members..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:text-primary transition-opacity duration-150 p-2 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">help</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-opacity duration-150 p-2 rounded-full hover:bg-surface-container">
+<span class="material-symbols-outlined">apps</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden ml-2 cursor-pointer border border-border-low-opacity">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Professional headshot of an enterprise user in a bright office environment, high resolution, soft lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOO-jT0ueBaORoSKmq-OpMrpUsN8Lak5ETMxCiMiiyxFw9rYxZTErKp_K25zqU1M10VjghJlxDg1QSPCT5lNNN7GIbX5dlFZirg-Ji60rXUV7TrLoiOYa63XeL17M_LsfJdNttcoe0SOD3MH1i_MScMyrm6tjBNhPe0_oVEQKKKpdJQVVbQyLolqrfchBcjH4lqlDLy0MNFY6DzxuNSuEnJqtVtMve9X3_pIsdtvRJ3icGW-MRopsoLQ"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Content Canvas -->
+<main class="flex-1 mt-16 p-page-margin overflow-y-auto bg-background">
+<div class="flex justify-between items-end mb-section-gap">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Project Tracking Dashboard</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Divisi Enterprise Jaya Survei Indonesia</p>
+</div>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-body-md font-medium hover:bg-primary-fixed-dim transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+                    Tambah Proyek
+                </button>
+</div>
+<!-- Summary Cards (Bento Grid) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-element-gap md:gap-section-gap mb-section-gap">
+<div class="bg-surface-container-lowest p-card-padding rounded-xl border border-border-low-opacity shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Total Proyek</span>
+<span class="material-symbols-outlined text-outline">folder_copy</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface">42</span>
+</div>
+<div class="bg-surface-container-lowest p-card-padding rounded-xl border border-border-low-opacity shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Sedang Berjalan</span>
+<span class="material-symbols-outlined text-secondary">trending_up</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface">28</span>
+</div>
+<div class="bg-surface-container-lowest p-card-padding rounded-xl border border-border-low-opacity shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Selesai</span>
+<span class="material-symbols-outlined text-status-low">check_circle</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-on-surface">10</span>
+</div>
+<div class="bg-surface-container-lowest p-card-padding rounded-xl border border-error shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex flex-col justify-between relative overflow-hidden">
+<div class="absolute top-0 right-0 w-16 h-16 bg-error-container/20 rounded-bl-full -mr-4 -mt-4"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="font-label-md text-label-md text-status-high uppercase tracking-wider font-semibold">Prioritas Tinggi</span>
+<span class="material-symbols-outlined text-status-high icon-fill">priority_high</span>
+</div>
+<span class="font-headline-lg text-headline-lg text-status-high relative z-10">4</span>
+</div>
+</div>
+<!-- Priority Projects Table -->
+<div class="bg-surface-container-lowest rounded-xl border border-border-low-opacity shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+<div class="p-4 border-b border-border-low-opacity bg-surface-container/50 flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Priority Projects</h3>
+<button class="text-secondary font-label-md hover:underline flex items-center gap-1">View All <span class="material-symbols-outlined text-[16px]">arrow_forward</span></button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-lowest border-b border-border-low-opacity">
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Nama Proyek</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Jenis</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Prioritas</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest w-48">Progres</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Status</th>
+<th class="py-3 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest text-right">Aksi</th>
+</tr>
+</thead>
+<tbody class="text-body-md font-body-md text-on-surface">
+<!-- High Priority Item 1 -->
+<tr class="border-b border-border-low-opacity hover:bg-surface-container transition-colors group cursor-pointer bg-error-container/5">
+<td class="py-4 px-6 font-medium text-on-surface">
+<div class="flex items-center gap-2">
+                                        Survei Kepuasan Pelanggan Q3
+                                        <span class="material-symbols-outlined text-status-high text-[16px] icon-fill" title="High Priority">warning</span>
+</div>
+</td>
+<td class="py-4 px-6 text-on-surface-variant">Riset</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-error-container/30 text-status-high border border-error-container/50">Tinggi</span>
+</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-status-high rounded-full w-[75%]"></div>
+</div>
+<span class="text-label-md text-on-surface-variant min-w-[3ch]">75%</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 text-secondary">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                                        Sedang Berjalan
+                                    </span>
+</td>
+<td class="py-4 px-6 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-on-surface-variant hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- High Priority Item 2 -->
+<tr class="border-b border-border-low-opacity hover:bg-surface-container transition-colors group cursor-pointer bg-error-container/5">
+<td class="py-4 px-6 font-medium text-on-surface">
+<div class="flex items-center gap-2">
+                                        Implementasi Sistem ERP Baru
+                                        <span class="material-symbols-outlined text-status-high text-[16px] icon-fill">warning</span>
+</div>
+</td>
+<td class="py-4 px-6 text-on-surface-variant">Jasa</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-error-container/30 text-status-high border border-error-container/50">Tinggi</span>
+</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-status-high rounded-full w-[10%]"></div>
+</div>
+<span class="text-label-md text-on-surface-variant min-w-[3ch]">10%</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 text-on-surface-variant">
+<span class="w-2 h-2 rounded-full border-2 border-outline-variant"></span>
+                                        Belum Mulai
+                                    </span>
+</td>
+<td class="py-4 px-6 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-on-surface-variant hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Medium Priority Item -->
+<tr class="border-b border-border-low-opacity hover:bg-surface-container transition-colors group cursor-pointer">
+<td class="py-4 px-6 font-medium text-on-surface">Pelatihan Keselamatan Kerja</td>
+<td class="py-4 px-6 text-on-surface-variant">Training</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-tertiary-container/50 text-status-medium border border-tertiary/20">Sedang</span>
+</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-secondary rounded-full w-[45%]"></div>
+</div>
+<span class="text-label-md text-on-surface-variant min-w-[3ch]">45%</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 text-secondary">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                                        Sedang Berjalan
+                                    </span>
+</td>
+<td class="py-4 px-6 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-on-surface-variant hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Low Priority Item -->
+<tr class="border-b border-border-low-opacity hover:bg-surface-container transition-colors group cursor-pointer">
+<td class="py-4 px-6 font-medium text-on-surface">Audit Internal Tahunan</td>
+<td class="py-4 px-6 text-on-surface-variant">Jasa</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-surface-container text-on-surface-variant border border-border-low-opacity">Rendah</span>
+</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-status-low rounded-full w-[100%]"></div>
+</div>
+<span class="text-label-md text-on-surface-variant min-w-[3ch]">100%</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 text-status-low">
+<span class="material-symbols-outlined text-[16px] icon-fill">check_circle</span>
+                                        Selesai
+                                    </span>
+</td>
+<td class="py-4 px-6 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-on-surface-variant hover:text-on-surface p-1"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Divisi Enterprise - Project Tracking Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "tertiary": "#b9c8de",
+                "on-background": "#dae2fd",
+                "background": "#0b1326",
+                "status-low": "#4ade80",
+                "surface-bright": "#31394d",
+                "primary-container": "#1e293b",
+                "inverse-on-surface": "#283044",
+                "on-primary-fixed-variant": "#3c475a",
+                "tertiary-fixed": "#d4e4fa",
+                "error-container": "#93000a",
+                "on-primary-fixed": "#111c2d",
+                "status-medium": "#fbbf24",
+                "surface-container-highest": "#2d3449",
+                "surface-container-high": "#222a3d",
+                "surface-tint": "#bcc7de",
+                "on-surface-bright": "#f8fafc",
+                "on-secondary-fixed-variant": "#004c6e",
+                "border-low-opacity": "rgba(226, 232, 240, 0.1)",
+                "secondary-fixed": "#c9e6ff",
+                "on-tertiary-fixed-variant": "#39485a",
+                "on-primary-container": "#8590a6",
+                "on-surface-muted": "#94a3b8",
+                "secondary": "#89ceff",
+                "on-secondary-fixed": "#001e2f",
+                "inverse-surface": "#dae2fd",
+                "on-primary": "#263143",
+                "surface-charcoal": "#0f172a",
+                "on-secondary": "#00344d",
+                "outline-variant": "#45474c",
+                "secondary-fixed-dim": "#89ceff",
+                "surface-dim": "#0b1326",
+                "primary-fixed": "#d8e3fb",
+                "primary-fixed-dim": "#bcc7de",
+                "primary": "#bcc7de",
+                "on-surface-variant": "#c5c6cd",
+                "surface-container": "#171f33",
+                "inverse-primary": "#545f73",
+                "on-tertiary": "#233143",
+                "surface-slate": "#1e293b",
+                "tertiary-fixed-dim": "#b9c8de",
+                "on-error": "#690005",
+                "on-secondary-container": "#00344e",
+                "tertiary-container": "#1b2a3b",
+                "surface-container-low": "#131b2e",
+                "error": "#ffb4ab",
+                "outline": "#8f9097",
+                "surface": "#0b1326",
+                "on-tertiary-container": "#8291a6",
+                "status-high": "#fb7185",
+                "on-surface": "#dae2fd",
+                "on-error-container": "#ffdad6",
+                "on-tertiary-fixed": "#0d1c2d",
+                "surface-container-lowest": "#060e20",
+                "secondary-container": "#00a2e6",
+                "surface-variant": "#2d3449"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "card-padding": "1.25rem",
+                "page-margin": "2rem",
+                "gutter": "1rem",
+                "section-gap": "1.5rem",
+                "element-gap": "0.5rem"
+        },
+        "fontFamily": {
+                "body-md": [
+                        "Inter"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "headline-sm": [
+                        "Inter"
+                ],
+                "label-md": [
+                        "Inter"
+                ],
+                "headline-lg-mobile": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Inter"
+                ],
+                "headline-md": [
+                        "Inter"
+                ],
+                "label-caps": [
+                        "Inter"
+                ]
+        },
+        "fontSize": {
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "1.5",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "16px",
+                        {
+                                "lineHeight": "1.6",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-sm": [
+                        "18px",
+                        {
+                                "lineHeight": "1.4",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-md": [
+                        "12px",
+                        {
+                                "lineHeight": "1",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "1.2",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "1.2",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "1.3",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-caps": [
+                        "11px",
+                        {
+                                "lineHeight": "1",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg overflow-x-hidden">
+<!-- Navbar -->
+<nav class="fixed top-0 w-full bg-surface-container-lowest/90 backdrop-blur-md border-b border-border-low-opacity z-50 h-16 flex justify-between items-center px-page-margin">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">view_kanban</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Divisi Enterprise</span>
+</div>
+<div class="hidden md:flex gap-6 items-center">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Features</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">How it works</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Jaya Survei Indonesia (JSI)</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="font-label-md text-label-md text-on-surface hover:text-primary transition-colors hidden md:block">Log in</button>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-4 py-2 rounded shadow-sm hover:bg-opacity-90 transition-all">Get Started</button>
+</div>
+</nav>
+<!-- Hero Section -->
+<section class="pt-32 pb-20 px-page-margin max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
+<div class="w-full md:w-1/2 flex flex-col gap-6">
+<div class="inline-flex items-center gap-2 bg-primary-container px-3 py-1 rounded-full w-fit">
+<span class="material-symbols-outlined text-secondary text-sm">rocket_launch</span>
+<span class="font-label-md text-label-md text-secondary">New: Automated Reminders</span>
+</div>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface max-w-2xl">
+                Centralize your team projects. Elevate visibility.
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
+                For Jaya Survei Indonesia (JSI). Bring transparency and efficiency to every initiative. One dashboard to track progress, manage priorities, and collaborate seamlessly.
+            </p>
+<div class="flex flex-col sm:flex-row gap-4 pt-4">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-6 py-3 rounded shadow-sm hover:bg-opacity-90 transition-all flex justify-center items-center gap-2">
+                    Get Started
+                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+<button class="border border-border-low-opacity text-on-surface font-label-md text-label-md px-6 py-3 rounded hover:bg-surface-container transition-colors flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-sm">play_circle</span>
+                    See how it works
+                </button>
+</div>
+</div>
+<div class="w-full md:w-1/2 relative h-[400px]">
+<!-- Abstract representation of a dashboard instead of raw image -->
+<div class="absolute inset-0 rounded-xl overflow-hidden shadow-lg border border-border-low-opacity bg-surface-container-lowest">
+<div class="absolute top-4 left-4 right-4 h-12 bg-surface-container rounded border border-border-low-opacity flex items-center px-4 gap-4">
+<div class="w-3 h-3 rounded-full bg-status-high"></div>
+<div class="w-3 h-3 rounded-full bg-status-medium"></div>
+<div class="w-3 h-3 rounded-full bg-status-low"></div>
+<div class="flex-1 h-2 bg-surface-dim rounded ml-4"></div>
+</div>
+<div class="absolute top-20 left-4 w-48 h-full bg-surface-container border-r border-border-low-opacity flex flex-col gap-4 pt-4">
+<div class="h-4 w-32 bg-surface-dim rounded mx-4"></div>
+<div class="h-4 w-24 bg-surface-dim rounded mx-4 mt-2"></div>
+<div class="h-4 w-28 bg-surface-dim rounded mx-4 mt-2"></div>
+</div>
+<div class="absolute top-20 left-56 right-4 bottom-4 flex flex-col gap-4">
+<div class="glass-card h-24 rounded-lg flex items-center p-4">
+<div class="w-10 h-10 rounded bg-secondary-container flex items-center justify-center mr-4">
+<span class="material-symbols-outlined text-on-secondary-container">analytics</span>
+</div>
+<div class="flex-1">
+<div class="h-4 w-1/3 bg-surface-dim rounded mb-2"></div>
+<div class="h-2 w-full bg-surface-variant rounded overflow-hidden">
+<div class="h-full w-3/4 bg-secondary"></div>
+</div>
+</div>
+</div>
+<div class="glass-card flex-1 rounded-lg grid grid-cols-2 gap-4 p-4">
+<div class="bg-surface-container rounded border border-border-low-opacity"></div>
+<div class="bg-surface-container rounded border border-border-low-opacity"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section class="py-20 bg-surface px-page-margin">
+<div class="max-w-7xl mx-auto">
+<div class="text-center mb-16">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Everything you need to track progress</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl mx-auto">Replace scattered spreadsheets and endless threads with a single source of truth for all enterprise initiatives.</p>
+</div>
+<div class="bento-grid">
+<!-- Feature 1: Real-time Updates -->
+<div class="col-span-12 md:col-span-8 glass-card rounded-xl p-card-padding flex flex-col justify-between min-h-[300px] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-secondary-container/20 rounded-full blur-3xl -mr-10 -mt-10 transition-transform duration-500 group-hover:scale-110"></div>
+<div class="relative z-10 w-full max-w-md">
+<div class="w-12 h-12 rounded-lg bg-surface-container-lowest border border-border-low-opacity flex items-center justify-center mb-6 shadow-sm">
+<span class="material-symbols-outlined text-secondary">update</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-3">Real-time Updates</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Log progress instantly. Ensure everyone from stakeholders to team members sees the latest status without asking for reports.</p>
+<a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors flex items-center gap-1" href="#">
+                            Explore tracking <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+<!-- Decorative mock UI element -->
+<div class="absolute bottom-6 right-6 w-1/3 min-w-[200px] bg-surface-container-lowest rounded border border-border-low-opacity p-3 shadow-sm transform translate-y-4 opacity-80 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 hidden sm:block">
+<div class="flex items-center gap-2 mb-2">
+<div class="w-6 h-6 rounded-full bg-primary-fixed-dim"></div>
+<div class="flex-1">
+<div class="h-2 w-full bg-surface-dim rounded"></div>
+</div>
+</div>
+<div class="text-xs text-status-low font-medium">100% Completed</div>
+</div>
+</div>
+<!-- Feature 2: Priority Management -->
+<div class="col-span-12 md:col-span-4 glass-card rounded-xl p-card-padding flex flex-col relative overflow-hidden">
+<div class="w-12 h-12 rounded-lg bg-surface-container-lowest border border-border-low-opacity flex items-center justify-center mb-6 shadow-sm z-10">
+<span class="material-symbols-outlined text-status-high">flag</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-3 z-10">Priority Management</h3>
+<p class="font-body-md text-body-md text-on-surface-variant z-10 flex-1">Surface what matters most. Automatically highlight high-priority projects.</p>
+<div class="mt-6 flex flex-col gap-2 z-10">
+<div class="px-3 py-2 rounded bg-surface-container-lowest border border-border-low-opacity flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface">Project Alpha</span>
+<span class="font-label-caps text-label-caps text-status-high bg-error-container px-2 py-1 rounded">HIGH</span>
+</div>
+<div class="px-3 py-2 rounded bg-surface-container-lowest border border-border-low-opacity flex justify-between items-center opacity-70">
+<span class="font-label-md text-label-md text-on-surface">Project Beta</span>
+<span class="font-label-caps text-label-caps text-status-medium bg-tertiary-container px-2 py-1 rounded text-status-medium">MEDIUM</span>
+</div>
+</div>
+</div>
+<!-- Feature 3: Team Collaboration -->
+<div class="col-span-12 md:col-span-12 glass-card rounded-xl p-card-padding flex flex-col md:flex-row items-center gap-8">
+<div class="w-full md:w-1/2">
+<div class="w-12 h-12 rounded-lg bg-surface-container-lowest border border-border-low-opacity flex items-center justify-center mb-6 shadow-sm">
+<span class="material-symbols-outlined text-secondary">groups</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-3">Team Collaboration</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Break down silos across Divisi Enterprise. View cross-functional projects, leave contextual comments, and receive automated notifications when your input is needed.</p>
+</div>
+<div class="w-full md:w-1/2 h-48 bg-surface-container rounded-lg border border-border-low-opacity relative overflow-hidden flex items-center justify-center">
+<!-- Placeholder for abstract illustration -->
+<div class="relative z-10 flex -space-x-4">
+<div class="w-12 h-12 rounded-full border-2 border-surface-container-lowest bg-primary-fixed flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-secondary text-sm">person</span>
+</div>
+<div class="w-12 h-12 rounded-full border-2 border-surface-container-lowest bg-secondary-fixed flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-secondary-container text-sm">person</span>
+</div>
+<div class="w-12 h-12 rounded-full border-2 border-surface-container-lowest bg-tertiary-fixed flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-tertiary-fixed text-sm">person</span>
+</div>
+<div class="w-12 h-12 rounded-full border-2 border-surface-container-lowest bg-surface-dim flex items-center justify-center shadow-sm text-xs font-medium text-on-surface">
+                                +3
+                            </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-surface-container-low w-full py-8 border-t border-border-low-opacity px-page-margin mt-12">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">view_kanban</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface">Divisi Enterprise</span>
+</div>
+<div class="flex flex-wrap gap-6 justify-center">
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Contact Support</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-secondary transition-colors" href="#">Documentation</a>
+</div>
+<div class="font-label-md text-label-md text-on-surface-variant">
+                © 2024 Divisi Enterprise. All rights reserved.
+            </div>
+</div>
+</footer>
+</body></html>
