@@ -41,6 +41,7 @@ Tujuan utamanya adalah meningkatkan transparansi, efisiensi koordinasi, dan mema
 | F15 | Halaman Profil Anggota | Menampilkan detail anggota tim dan daftar proyek yang sedang dikerjakan |
 | F16 | Timeline & Alokasi Jadwal | Pengguna dapat melihat visualisasi timeline/Gantt chart proyek yang berjalan dalam rentang waktu yang sama untuk memetakan jadwal overlap dan membagi fokus serta alokasi tim lapangan secara optimal |
 | F17 | Pengaturan Tema & Tampilan | Pengguna dapat memilih mode tampilan (Dark Mode / Light Mode) atau preferensi tema warna aksen antarmuka untuk kenyamanan visual, dan preferensi ini tersimpan di sistem/lokal |
+| F18 | Ekspor Data & Timeline | Daftar proyek dan timeline dapat diunduh sebagai Excel (.xlsx), Word (.docx), atau PDF. Ekspor mengikuti filter dan urutan yang sedang tampil di layar; nilainya tetap dibaca ulang di server sehingga berkas tidak pernah memuat angka yang sudah usang |
 
 ### Kebutuhan Non-Fungsional
 
@@ -147,6 +148,47 @@ Dua parameter memetakan langsung ke skor:
   Parameter "Nilai Proyek" tetap diukur dari Nilai Kontrak bruto sesuai kesepakatan.
   Kalau suatu saat tim ingin prioritas digerakkan margin, itu keputusan tim — bukan
   perubahan yang boleh masuk diam-diam lewat penambahan kolom.
+
+---
+
+## 3b. Ekspor Berkas
+
+Tiga format, dua cakupan (daftar proyek dan timeline). Berkasnya dibuat di server
+lewat **server action**, bukan route handler — alasannya sama dengan `lib/actions.ts`:
+route handler punya salinan modul sendiri, jadi berkas yang dibuat di sana akan
+memuat data awal, bukan perubahan yang baru disimpan orang lewat form. Ekspor yang
+diam-diam basi lebih berbahaya daripada ekspor yang gagal.
+
+| Format | Daftar Proyek | Timeline |
+|---|---|---|
+| Excel (.xlsx) | Seluruh kolom, angka sebagai angka, baris kepala dibekukan | 3 lembar: jadwal, bentrok jadwal, bentrok PIC |
+| Word (.docx) | Tabel kolom inti, halaman bentang | Tabel jadwal + rincian bentrok |
+| PDF | Tabel kolom inti, berhalaman, kepala tabel diulang | **Gantt chart** dengan penanda bulan dan legenda prioritas |
+
+**Yang perlu dicatat:**
+
+- **Satu definisi kolom** di `lib/export/dataset.ts` dipakai ketiga format, jadi
+  Excel, Word, dan PDF tidak bisa menyajikan angka berbeda untuk proyek yang sama.
+  Yang boleh berbeda hanya kolom mana yang dipakai — lembar kerja muat memuat
+  semuanya, halaman A4 tidak.
+- **Excel menerima angka mentah**, bukan teks berformat. Orang membuka spreadsheet
+  justru untuk menjumlah dan membuat pivot; "Rp 505.000.000" sebagai teks
+  membatalkan semua itu.
+- **Tanggal ditulis ISO** (`YYYY-MM-DD`), bukan `Date` Excel. Mengubahnya jadi
+  tanggal sungguhan berarti menyerahkan penafsiran zona waktu ke Excel, dan
+  tanggal kontrak yang bergeser sehari jauh lebih merugikan daripada kolom yang
+  tidak bisa difilter sebagai tanggal. ISO tetap terurut benar secara teks.
+- **Gantt di PDF memakai `barPosition()` dan `monthTicks()` yang sama dengan layar**,
+  sehingga grafik cetak tidak bisa bergeser dari grafik di aplikasi.
+- Font standar PDF hanya mengenal WinAnsi. Nama proyek datang dari isian orang,
+  jadi teksnya dijinakkan lebih dulu (`aman()`) — berkas dengan satu tanda tanya
+  jauh lebih baik daripada ekspor yang gagal total.
+- Ekspor **mengikuti filter di layar** lewat daftar id, tapi nilainya dibaca ulang
+  di server. Kolom yang disembunyikan di tabel **tetap ikut** ke Excel: menyembunyikan
+  kolom itu soal ruang layar, bukan soal apa yang mau dibawa keluar.
+
+Pustaka: `write-excel-file` (xlsx), `docx`, `pdf-lib`. Ketiganya murni JavaScript
+tanpa dependensi native.
 
 ---
 

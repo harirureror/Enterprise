@@ -22,6 +22,8 @@ function p(
     priorityMode: "auto",
     progressPct: 0,
     clientOrg: "PT Uji",
+    locationCity: "",
+    locationProvince: "",
     clientName: "",
     clientEmail: "",
     clientPhone: "",

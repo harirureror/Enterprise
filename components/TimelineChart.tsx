@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Badge from "@/components/Badge";
+import ExportMenu from "@/components/ExportMenu";
 import { SEMUA, type Semua, filterProjects } from "@/lib/filters";
 import { getUser } from "@/lib/mock-data";
 import { barPosition, monthTicks, overlapInfo, overlapPerMonth, timelineRange } from "@/lib/timeline";
@@ -148,9 +149,14 @@ export default function TimelineChart({ projects }: { projects: Project[] }) {
     <div>
       {filterBar}
 
-      <p className="mb-2 text-sm text-muted" aria-live="polite">
-        Menampilkan {filtered.length} dari {projects.length} proyek
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted" aria-live="polite">
+          Menampilkan {filtered.length} dari {projects.length} proyek
+        </p>
+        {/* Urutannya sama dengan bar di bawah, jadi berkas ekspornya membaca
+           persis seperti grafik yang sedang dilihat. */}
+        <ExportMenu scope="timeline" ids={rows.map((p) => p.id)} label="Ekspor timeline" />
+      </div>
 
       {/* Indikator bentrok: total, sebaran per bulan, dan bulan paling padat. */}
       <section

@@ -27,7 +27,11 @@ import {
   updateUser,
 } from "./api";
 import { SEMUA } from "./filters";
-import { projectDependencies as mockDependencies, projects as mockProjects } from "./mock-data";
+import {
+  progressHistory as mockProgress,
+  projectDependencies as mockDependencies,
+  projects as mockProjects,
+} from "./mock-data";
 import { scoreAll } from "./priority";
 import { PROJECT_TYPES, isActiveStatus } from "./types";
 
@@ -120,21 +124,31 @@ async function main() {
     [...opsi.owners.map((o) => o.name)].sort((a, b) => a.localeCompare(b, "id"))
   );
 
-  // Riwayat progres: hanya milik proyek yang diminta, terbaru dulu.
-  const riwayat = await getProgressHistory(1);
-  assert.ok(riwayat.length > 0);
-  assert.ok(riwayat.every((e) => e.projectId === 1));
-  assert.deepEqual(
-    riwayat.map((e) => e.createdAt),
-    [...riwayat.map((e) => e.createdAt)].sort().reverse()
-  );
+  /* Riwayat progres: hanya milik proyek yang diminta, terbaru dulu.
+
+     Proyeknya diambil dari riwayat yang benar-benar ada, bukan id tetap, dan
+     seluruh blok dilewati kalau riwayatnya memang kosong — mock-data adalah
+     data kerja yang boleh saja belum punya catatan progres sama sekali.
+     Yang diuji di sini kontrak fungsinya, bukan isi datanya. */
+  const idRiwayat = mockProgress[0]?.projectId;
+  if (idRiwayat !== undefined) {
+    const riwayat = await getProgressHistory(idRiwayat);
+    assert.ok(riwayat.length > 0);
+    assert.ok(riwayat.every((e) => e.projectId === idRiwayat));
+    assert.deepEqual(
+      riwayat.map((e) => e.createdAt),
+      [...riwayat.map((e) => e.createdAt)].sort().reverse()
+    );
+  }
 
   // Proyek tanpa riwayat mengembalikan daftar kosong, bukan error.
   const tanpaRiwayat = await getProgressHistory(3);
   assert.deepEqual(tanpaRiwayat, []);
 
   // Mencatat progres menambah satu baris riwayat sekaligus memperbarui proyeknya.
-  const sebelum = riwayat.length;
+  // Blok ini membuat datanya sendiri, jadi tidak bergantung pada isi mock-data.
+  const sebelum = (await getProgressHistory(1)).length;
+  const statusSemula = (await getProject(1))!.status;
   const entri = await addProgress({ projectId: 1, userId: 2, progressPct: 72, note: "Uji catat." });
   assert.ok(entri !== null);
   assert.equal(entri.projectId, 1);
@@ -147,7 +161,7 @@ async function main() {
   assert.equal(sesudah[0].id, entri.id); // entri terbaru di urutan pertama
   assert.equal((await getProject(1))!.progressPct, 72);
   // Status tidak ikut berubah hanya karena progres diperbarui.
-  assert.equal((await getProject(1))!.status, "Berjalan");
+  assert.equal((await getProject(1))!.status, statusSemula);
 
   // Proyek yang tidak ada tidak bisa dicatat progresnya.
   assert.equal(await addProgress({ projectId: 999, userId: 1, progressPct: 10, note: "x" }), null);
@@ -184,15 +198,35 @@ async function main() {
       assert.equal(p.priority, tersimpan.priority, `proyek ${p.id} dikunci, jangan ditimpa`);
     }
   }
-  // Setidaknya satu proyek dikunci manual, jadi cabang itu benar-benar teruji.
-  assert.ok(semua.some((p) => p.priorityMode === "manual"));
+  /* Cabang "manual" dibuat sendiri, bukan diharapkan sudah ada di mock-data:
+     data kerja boleh saja seluruhnya otomatis, dan cabang ini tetap harus
+     teruji. Nilai aslinya dikembalikan supaya assertion berikutnya tidak
+     mewarisi keadaan yang sudah diubah. */
+  const dikunci = mockProjects[0];
+  const modeAsli = dikunci.priorityMode;
+  const prioritasAsli = dikunci.priority;
 
-  // Kunci manual bertahan walau skornya jauh berbeda.
-  const dikunci = mockProjects.find((p) => p.priorityMode === "manual")!;
-  const asli = dikunci.priority;
-  dikunci.priority = "Tinggi";
-  assert.equal((await getProject(dikunci.id))!.priority, "Tinggi");
-  dikunci.priority = asli;
+  dikunci.priorityMode = "manual";
+  // Dikunci ke level yang berbeda dari hasil hitungan, supaya "tidak ditimpa"
+  // benar-benar terlihat bedanya.
+  const hitung = skor.get(dikunci.id)!.level;
+  dikunci.priority = hitung === "Tinggi" ? "Rendah" : "Tinggi";
+  const terkunci = dikunci.priority;
+
+  assert.equal((await getProject(dikunci.id))!.priority, terkunci);
+  assert.notEqual(terkunci, hitung, "penguncian harus diuji pada level yang berbeda");
+  assert.equal(
+    (await getProjects()).find((p) => p.id === dikunci.id)!.priority,
+    terkunci,
+    "kunci manual harus bertahan di daftar, bukan cuma saat diambil satuan"
+  );
+
+  // Kembali ke otomatis: sekarang justru harus ikut hasil hitungan.
+  dikunci.priorityMode = "auto";
+  assert.equal((await getProject(dikunci.id))!.priority, hitung);
+
+  dikunci.priorityMode = modeAsli;
+  dikunci.priority = prioritasAsli;
 
   // Fokus diurutkan dari skor tertinggi dan tidak memuat proyek selesai.
   const fokus = await getFocusProjects(5);

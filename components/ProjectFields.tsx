@@ -292,6 +292,36 @@ export default function ProjectFields({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
               <span className="font-medium">
+                Kota/Kabupaten <span className="font-normal text-muted">(opsional)</span>
+              </span>
+              <input
+                {...a11y("locationCity")}
+                type="text"
+                onChange={(e) => onChange("locationCity", e.target.value)}
+                placeholder="Contoh: Prabumulih"
+                className={`mt-1 ${inputClass(errors.locationCity)}`}
+              />
+              <Pesan id={errId("locationCity")} message={errors.locationCity} />
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium">
+                Provinsi <span className="font-normal text-muted">(opsional)</span>
+              </span>
+              <input
+                {...a11y("locationProvince")}
+                type="text"
+                onChange={(e) => onChange("locationProvince", e.target.value)}
+                placeholder="Contoh: Sumatera Selatan"
+                className={`mt-1 ${inputClass(errors.locationProvince)}`}
+              />
+              <Pesan id={errId("locationProvince")} message={errors.locationProvince} />
+            </label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="font-medium">
                 Email <span className="font-normal text-muted">(opsional)</span>
               </span>
               <input

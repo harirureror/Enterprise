@@ -113,10 +113,10 @@ export function seed(db: DatabaseSync): {
   const insertProject = db.prepare(`
     INSERT INTO projects
       (id, name, description, type, status, priority, priority_mode, progress_pct,
-       client_org, client_name, client_email, client_phone, client_tier, penalty_risk, value,
+       client_org, location_city, location_province, client_name, client_email, client_phone, client_tier, penalty_risk, value,
        contract_no, contract_date, payment_term, payment_note, tax_type, sales_fee,
        operational_cost, start_date, deadline, owner_id, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       description = excluded.description,
@@ -126,6 +126,8 @@ export function seed(db: DatabaseSync): {
       priority_mode = excluded.priority_mode,
       progress_pct = excluded.progress_pct,
       client_org = excluded.client_org,
+      location_city = excluded.location_city,
+      location_province = excluded.location_province,
       client_name = excluded.client_name,
       client_email = excluded.client_email,
       client_phone = excluded.client_phone,
@@ -169,6 +171,8 @@ export function seed(db: DatabaseSync): {
         p.priorityMode,
         p.progressPct,
         p.clientOrg,
+        p.locationCity,
+        p.locationProvince,
         p.clientName,
         p.clientEmail,
         p.clientPhone,

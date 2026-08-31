@@ -52,6 +52,8 @@ export function filterProjects(
         p.name.toLowerCase().includes(kata) ||
         p.description.toLowerCase().includes(kata) ||
         p.clientOrg.toLowerCase().includes(kata) ||
+        p.locationCity.toLowerCase().includes(kata) ||
+        p.locationProvince.toLowerCase().includes(kata) ||
         p.clientName.toLowerCase().includes(kata) ||
         p.contractNo.toLowerCase().includes(kata))
   );

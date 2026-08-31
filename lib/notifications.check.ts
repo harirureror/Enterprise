@@ -19,6 +19,8 @@ function p(id: number, over: Partial<Project> = {}): Project {
     priorityMode: "auto",
     progressPct: 50,
     clientOrg: "PT Uji",
+    locationCity: "",
+    locationProvince: "",
     clientName: "",
     clientEmail: "",
     clientPhone: "",

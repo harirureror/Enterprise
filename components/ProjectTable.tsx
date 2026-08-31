@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Badge from "@/components/Badge";
+import ExportMenu from "@/components/ExportMenu";
 import ProjectDeleteDialog from "@/components/ProjectDeleteDialog";
 import ProjectEditModal from "@/components/ProjectEditModal";
 import { SEMUA, type Semua, filterProjects } from "@/lib/filters";
@@ -244,6 +245,10 @@ export default function ProjectTable({
         <p className="text-sm text-muted" aria-live="polite">
           Menampilkan {rows.length} dari {projects.length} proyek
         </p>
+        <div className="flex items-center gap-2">
+          {/* Ekspor mengikuti hasil saring dan urutan di layar — itu yang
+             sedang dilihat orang saat menekannya. */}
+          <ExportMenu scope="proyek" ids={rows.map((p) => p.id)} />
         {aktifCount > 0 && (
           <button
             type="button"
@@ -253,6 +258,7 @@ export default function ProjectTable({
             Hapus filter ({aktifCount})
           </button>
         )}
+        </div>
       </div>
 
       {rows.length === 0 ? (

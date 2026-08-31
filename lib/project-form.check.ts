@@ -29,6 +29,8 @@ function draft(over: Partial<ProjectDraft> = {}): ProjectDraft {
     priorityMode: "auto",
     progressPct: "0",
     clientOrg: "PT Pelindo Regional 3",
+    locationCity: "Semarang",
+    locationProvince: "Jawa Tengah",
     clientName: "Capt. Bambang Sujarwo",
     clientEmail: "bambang.s@pelindo.co.id",
     clientPhone: "+62 811-3344-5566",
@@ -243,6 +245,8 @@ const tersimpan: Project = {
   priorityMode: "manual",
   progressPct: 55,
   clientOrg: "Dinas PU Kota Bandung",
+  locationCity: "Bandung",
+  locationProvince: "Jawa Barat",
   clientName: "Dedi Kurniawan",
   clientEmail: "dedi.k@bandung.go.id",
   clientPhone: "(022) 4231-9080",
@@ -268,6 +272,8 @@ assert.equal(dimuat.progressPct, "55");
 assert.equal(dimuat.ownerId, "3");
 assert.equal(dimuat.value, "275000000");
 assert.equal(dimuat.clientOrg, "Dinas PU Kota Bandung");
+assert.equal(dimuat.locationCity, "Bandung");
+assert.equal(dimuat.locationProvince, "Jawa Barat");
 assert.equal(dimuat.clientTier, "Reguler");
 assert.equal(dimuat.penaltyRisk, "Denda tetap");
 assert.deepEqual(Object.keys(dimuat).sort(), Object.keys(emptyDraft()).sort());
@@ -289,6 +295,8 @@ assert.equal(kembali.startDate, tersimpan.startDate);
 assert.equal(kembali.deadline, tersimpan.deadline);
 assert.equal(kembali.ownerId, tersimpan.ownerId);
 assert.equal(kembali.contractNo, tersimpan.contractNo);
+assert.equal(kembali.locationCity, tersimpan.locationCity);
+assert.equal(kembali.locationProvince, tersimpan.locationProvince);
 assert.equal(kembali.contractDate, tersimpan.contractDate);
 assert.equal(kembali.paymentTerm, tersimpan.paymentTerm);
 assert.equal(kembali.paymentNote, tersimpan.paymentNote);

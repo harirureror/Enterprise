@@ -116,6 +116,10 @@ export type Project = {
   progressPct: number;
   /** Instansi pemberi kerja — satu-satunya kolom klien yang wajib diisi. */
   clientOrg: string;
+  /** Lokasi Kota/Kabupaten klien */
+  locationCity: string;
+  /** Lokasi Provinsi klien */
+  locationProvince: string;
   /** PIC di sisi klien; "" kalau belum diketahui. */
   clientName: string;
   clientEmail: string;

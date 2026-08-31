@@ -23,6 +23,10 @@
 # database lokal (dibuat ulang lewat `npx tsx lib/db/setup.ts`)
 /data
 
+# berkas kerja sementara hasil konversi sheet ke JSON.
+# Sumber kebenaran datanya ada di lib/mock-data.ts, bukan di sini.
+/scratch_*.json
+
 # misc
 .DS_Store
 *.pem

@@ -29,6 +29,8 @@ function p(id: number, startDate: string, deadline: string, ownerId = 1): Projec
     priorityMode: "auto",
     progressPct: 0,
     clientOrg: "PT Uji",
+    locationCity: "",
+    locationProvince: "",
     clientName: "",
     clientEmail: "",
     clientPhone: "",

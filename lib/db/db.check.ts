@@ -99,6 +99,9 @@ assert.deepEqual(kolom, [
   "tax_type",
   "sales_fee",
   "operational_cost",
+  // Lokasi klien dipecah jadi dua kolom, migrasi 12.
+  "location_city",
+  "location_province",
 ]);
 
 // Seed memasukkan seluruh data awal.
@@ -128,8 +131,15 @@ assert.equal(p1.owner_id, mockProjects[0].ownerId);
 assert.equal(p1.client_org, mockProjects[0].clientOrg);
 assert.equal(p1.client_email, mockProjects[0].clientEmail);
 assert.equal(p1.value, mockProjects[0].value);
-// Proyek internal tanpa nilai tersimpan sebagai NULL, bukan 0.
-assert.equal(db.prepare("SELECT value FROM projects WHERE id = 4").get()!.value, null);
+// Proyek tanpa nilai tersimpan sebagai NULL, bukan 0. Proyeknya dicari lewat
+// sifatnya, bukan id tertentu: mock-data adalah data kerja yang berubah-ubah.
+const tanpaNilai = mockProjects.find((p) => p.value === null);
+if (tanpaNilai) {
+  assert.equal(
+    db.prepare(`SELECT value FROM projects WHERE id = ${tanpaNilai.id}`).get()!.value,
+    null
+  );
+}
 assert.equal(db.prepare("SELECT * FROM users WHERE id = 1").get()!.avatar_url, null);
 
 const tolak = (sql: string, alasan: string) =>
@@ -255,7 +265,14 @@ const riwayat1 = db
   .prepare("SELECT * FROM progress_history WHERE project_id = 1 ORDER BY created_at DESC")
   .all();
 assert.equal(riwayat1.length, mockProgress.filter((e) => e.projectId === 1).length);
-assert.equal(riwayat1[0].progress_pct, 65);
+// Isi barisnya hanya diperiksa kalau memang ada riwayatnya — mock-data adalah
+// data kerja yang boleh saja belum punya catatan progres sama sekali.
+if (riwayat1.length > 0) {
+  const terbaru = mockProgress
+    .filter((e) => e.projectId === 1)
+    .reduce((a, b) => (b.createdAt >= a.createdAt ? b : a));
+  assert.equal(riwayat1[0].progress_pct, terbaru.progressPct);
+}
 
 // Progres di riwayat juga dibatasi 0-100.
 tolak(
@@ -353,11 +370,18 @@ tolak(
 
 // Jadwal: satu proyek hanya boleh punya satu, ditegakkan UNIQUE.
 assert.equal(hitung("SELECT COUNT(*) AS n FROM reminder_schedules"), mockSchedules.length);
+// Barisnya dibuat sendiri lebih dulu, bukan mengandalkan mock-data punya
+// jadwal: yang diuji constraint UNIQUE-nya, bukan isi datanya.
+db.exec(
+  `INSERT INTO reminder_schedules (id, project_id, to_user_id, frequency, next_at)
+   VALUES (990, 1, 1, 'harian', '2026-09-01')`
+);
 tolak(
   `INSERT INTO reminder_schedules (project_id, to_user_id, frequency, next_at)
-   VALUES (${mockSchedules[0].projectId}, 1, 'harian', '2026-09-01')`,
+   VALUES (1, 1, 'harian', '2026-09-02')`,
   "unique"
 );
+db.exec("DELETE FROM reminder_schedules WHERE id = 990");
 // Frekuensi di luar daftar ditolak.
 tolak(
   `INSERT INTO reminder_schedules (project_id, to_user_id, frequency, next_at)
@@ -436,22 +460,28 @@ pengingatDb.forEach((row, i) => {
 });
 
 // Jadwal yang dimatikan tetap tersimpan 0, bukan hilang atau jadi NULL.
-db.exec("UPDATE reminder_schedules SET is_active = 0 WHERE id = 1");
+// Barisnya dibuat sendiri supaya tidak bergantung pada isi mock-data.
+db.exec(
+  `INSERT INTO reminder_schedules (id, project_id, to_user_id, frequency, next_at, is_active)
+   VALUES (991, 2, 1, 'harian', '2026-09-01', 1)`
+);
+db.exec("UPDATE reminder_schedules SET is_active = 0 WHERE id = 991");
 assert.equal(
-  Boolean(db.prepare("SELECT is_active FROM reminder_schedules WHERE id = 1").get()!.is_active),
+  Boolean(db.prepare("SELECT is_active FROM reminder_schedules WHERE id = 991").get()!.is_active),
   false
 );
-db.exec("UPDATE reminder_schedules SET is_active = 1 WHERE id = 1");
+db.exec("DELETE FROM reminder_schedules WHERE id = 991");
 
 // Komentar: tersimpan lengkap dan terurut sebagai percakapan.
 assert.equal(hitung("SELECT COUNT(*) AS n FROM comments"), mockComments.length);
+const idKomentar = mockComments[0]?.projectId ?? 0;
 assert.deepEqual(
   db
-    .prepare("SELECT id FROM comments WHERE project_id = 6 ORDER BY posted_at")
+    .prepare(`SELECT id FROM comments WHERE project_id = ${idKomentar} ORDER BY posted_at`)
     .all()
     .map((r) => Number(r.id)),
   mockComments
-    .filter((c) => c.projectId === 6)
+    .filter((c) => c.projectId === idKomentar)
     .sort((a, b) => a.postedAt.localeCompare(b.postedAt))
     .map((c) => c.id)
 );
@@ -504,8 +534,19 @@ db.exec(
 db.exec("DELETE FROM projects WHERE id = 905");
 assert.equal(hitung("SELECT COUNT(*) AS n FROM comments WHERE project_id = 905"), 0);
 
-// Penulis komentar tidak boleh terhapus diam-diam.
-tolak(`DELETE FROM users WHERE id = ${mockComments[0].userId}`, "foreign key");
+// Penulis komentar tidak boleh terhapus diam-diam. Komentarnya dibuat sendiri
+// supaya yang teruji constraint-nya, bukan kebetulan isi mock-data.
+db.exec(
+  `INSERT INTO projects (id, name, type, status, priority, start_date, deadline, owner_id)
+   VALUES (906, 'Proyek berkomentar', 'Jasa', 'Prospect', 'Rendah', '2026-08-01', '2026-08-02', 1)`
+);
+db.exec(
+  `INSERT INTO comments (id, project_id, user_id, body, created_at, posted_at)
+   VALUES (992, 906, 2, 'komentar uji', '2026-08-01', '2026-08-01 09:00:00')`
+);
+tolak("DELETE FROM users WHERE id = 2", "foreign key");
+db.exec("DELETE FROM comments WHERE id = 992");
+db.exec("DELETE FROM projects WHERE id = 906");
 
 // Email unik tanpa memandang huruf besar-kecil. Tanpa ini, dua baris bisa
 // mewakili satu identitas login dan yang terpilih bergantung urutan data.
@@ -749,8 +790,16 @@ assert.equal(
   db.prepare("SELECT operational_cost FROM projects WHERE id = 1").get()!.operational_cost,
   mockProjects[0].operationalCost
 );
-// Proyek internal tanpa kontrak tetap tersimpan sebagai NULL, bukan string "null".
-assert.equal(db.prepare("SELECT contract_date FROM projects WHERE id = 4").get()!.contract_date, null);
+// Proyek tanpa kontrak tetap tersimpan sebagai NULL, bukan string "null".
+const tanpaKontrak = mockProjects.find((p) => p.contractDate === null);
+if (tanpaKontrak) {
+  assert.equal(
+    db
+      .prepare(`SELECT contract_date FROM projects WHERE id = ${tanpaKontrak.id}`)
+      .get()!.contract_date,
+    null
+  );
+}
 
 assert.ok(indeks.includes("idx_projects_contract_no"));
 

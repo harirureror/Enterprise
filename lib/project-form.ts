@@ -23,6 +23,8 @@ export type ProjectDraft = {
   priorityMode: string;
   progressPct: string;
   clientOrg: string;
+  locationCity: string;
+  locationProvince: string;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -69,6 +71,8 @@ export function emptyDraft(): ProjectDraft {
     priorityMode: "auto",
     progressPct: "0",
     clientOrg: "",
+    locationCity: "",
+    locationProvince: "",
     clientName: "",
     clientEmail: "",
     clientPhone: "",
@@ -101,6 +105,8 @@ export function projectToDraft(project: Project): ProjectDraft {
     priorityMode: project.priorityMode,
     progressPct: String(project.progressPct),
     clientOrg: project.clientOrg,
+    locationCity: project.locationCity,
+    locationProvince: project.locationProvince,
     clientName: project.clientName,
     clientEmail: project.clientEmail,
     clientPhone: project.clientPhone,
@@ -271,6 +277,8 @@ export function draftToProject(draft: ProjectDraft): Omit<Project, "id"> {
     priorityMode: draft.priorityMode as Project["priorityMode"],
     progressPct: Number(draft.progressPct),
     clientOrg: draft.clientOrg.trim(),
+    locationCity: draft.locationCity.trim(),
+    locationProvince: draft.locationProvince.trim(),
     clientName: draft.clientName.trim(),
     clientEmail: draft.clientEmail.trim(),
     clientPhone: draft.clientPhone.trim(),

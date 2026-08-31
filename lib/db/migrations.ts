@@ -439,4 +439,13 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_projects_contract_no ON projects(contract_no);
     `,
   },
+  {
+    id: 12,
+    name: "tambah-kolom-lokasi-dan-provinsi",
+    up: `
+      -- Tambahan kolom untuk menyimpan Kota/Kabupaten dan Provinsi secara terpisah
+      ALTER TABLE projects ADD COLUMN location_city TEXT NOT NULL DEFAULT '';
+      ALTER TABLE projects ADD COLUMN location_province TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];
