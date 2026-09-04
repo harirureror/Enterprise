@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTeam } from "@/lib/api";
-import { requireSession } from "@/lib/auth";
-import { unauthorized } from "@/lib/auth-response";
+import { jagaRute } from "@/lib/api-guard";
 
 /**
  * GET /api/users — direktori anggota beserta jumlah proyeknya (PRD bagian 7).
@@ -11,8 +10,8 @@ import { unauthorized } from "@/lib/auth-response";
  * dropdown, pemilih PIC, dan sejenisnya tanpa menyeret data proyek.
  */
 export async function GET() {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("lihat-tim");
+  if (!izin.ok) return izin.response;
 
   const team = await getTeam();
 

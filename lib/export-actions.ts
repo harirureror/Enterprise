@@ -1,6 +1,8 @@
 "use server";
 
-import { getProjects, getUsers } from "@/lib/api";
+import { getAgenda, getProjects, getUsers } from "@/lib/api";
+import { getSessionUser } from "@/lib/auth";
+import { can, isFinanceField } from "@/lib/permissions";
 import {
   PRINT_COLUMN_KEYS,
   PROJECT_COLUMNS,
@@ -18,6 +20,7 @@ import {
   timelineSummary,
 } from "@/lib/export/timeline-dataset";
 import { datasetToWord } from "@/lib/export/word";
+import { berkasMingguan } from "@/lib/export/weekly";
 import type { Project } from "@/lib/types";
 
 /* Ekspor berkas.
@@ -33,7 +36,7 @@ import type { Project } from "@/lib/types";
    (puluhan sampai ribuan baris) tambahan 33% dari base64 tidak terasa. */
 
 export type ExportFormat = "excel" | "word" | "pdf";
-export type ExportScope = "proyek" | "timeline";
+export type ExportScope = "proyek" | "timeline" | "mingguan";
 
 export type ExportResult =
   | { ok: true; filename: string; mime: string; base64: string }
@@ -52,7 +55,7 @@ const EKSTENSI: Record<ExportFormat, string> = {
 };
 
 const FORMATS: ExportFormat[] = ["excel", "word", "pdf"];
-const SCOPES: ExportScope[] = ["proyek", "timeline"];
+const SCOPES: ExportScope[] = ["proyek", "timeline", "mingguan"];
 
 function hariIni(): string {
   return new Date().toISOString().slice(0, 10);
@@ -84,15 +87,35 @@ export async function exportProjects(
   if (!SCOPES.includes(scope)) return { ok: false, error: "Jenis ekspor tidak dikenal." };
   if (!FORMATS.includes(format)) return { ok: false, error: "Format ekspor tidak dikenal." };
 
+  const pengguna = await getSessionUser();
+  if (!pengguna) return { ok: false, error: "Perlu masuk untuk mengunduh berkas." };
+  if (!can(pengguna.accessLevel, "ekspor")) {
+    return { ok: false, error: "Akses Anda tidak mencakup ekspor." };
+  }
+
+  // Ditentukan sekali di sini, lalu diteruskan ke pembentuk dataset. Kolomnya
+  // dibuang SEBELUM berkasnya dibentuk, jadi angka keuangan tidak pernah ikut
+  // tertulis untuk peran yang tidak berhak — bukan disembunyikan belakangan.
+  const bolehKeuangan = can(pengguna.accessLevel, "lihat-keuangan");
+
   try {
     const projects = await pilihProyek(ids);
     const users = await getUsers();
     const tanggal = hariIni();
 
     const isi =
-      scope === "timeline"
-        ? await berkasTimeline(projects, users, format, tanggal)
-        : await berkasProyek(projects, users, format, tanggal);
+      scope === "mingguan"
+        ? await berkasMingguan({
+            projects,
+            users,
+            agenda: await getAgenda(),
+            format,
+            tanggal,
+            bolehKeuangan,
+          })
+        : scope === "timeline"
+          ? await berkasTimeline(projects, users, format, tanggal)
+          : await berkasProyek(projects, users, format, tanggal, bolehKeuangan);
 
     return {
       ok: true,
@@ -111,19 +134,28 @@ async function berkasProyek(
   projects: Project[],
   users: Awaited<ReturnType<typeof getUsers>>,
   format: ExportFormat,
-  tanggal: string
+  tanggal: string,
+  bolehKeuangan: boolean
 ): Promise<Buffer> {
   const rows = projectRows(projects, users, { today: tanggal });
   const catatan = [
     `${projects.length} proyek · dicetak ${tanggal}`,
-    "Nilai kontrak untuk klien PKP sudah termasuk PPN; margin dihitung dari DPP.",
+    bolehKeuangan
+      ? "Nilai kontrak untuk klien PKP sudah termasuk PPN; margin dihitung dari DPP."
+      : "Kolom keuangan tidak disertakan sesuai tingkat akses Anda.",
   ];
+
+  // Penyaringan kolom, bukan penimpaan nilai: baris yang nilainya dikosongkan
+  // akan terbaca "belum diisi", dan itu berbohong soal kelengkapan data.
+  const kolom = bolehKeuangan
+    ? PROJECT_COLUMNS
+    : PROJECT_COLUMNS.filter((c) => !isFinanceField(c.key));
 
   if (format === "excel") {
     // Spreadsheet dapat seluruh kolom: di sinilah orang menyaring dan menjumlah.
     return datasetToExcel({
       title: nameSheet("Daftar Proyek"),
-      columns: PROJECT_COLUMNS,
+      columns: kolom,
       rows,
       notes: catatan,
     });
@@ -132,7 +164,7 @@ async function berkasProyek(
   // Word dan PDF dicetak, jadi kolomnya dibatasi supaya tidak melar ke luar halaman.
   const dataset: Dataset = {
     title: "Daftar Proyek — Divisi Enterprise",
-    columns: pickColumns(PROJECT_COLUMNS, PRINT_COLUMN_KEYS),
+    columns: pickColumns(kolom, PRINT_COLUMN_KEYS),
     rows,
     notes: catatan,
   };

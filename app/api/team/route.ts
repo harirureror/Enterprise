@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTeam } from "@/lib/api";
-import { unauthorized } from "@/lib/auth-response";
-import { requireSession } from "@/lib/auth";
+import { jagaRute } from "@/lib/api-guard";
 
 /**
  * GET /api/team — beban kerja seluruh anggota.
@@ -11,8 +10,9 @@ import { requireSession } from "@/lib/auth";
  * ada, di luar produksi identitasnya jatuh ke pengguna bawaan — lihat lib/auth.ts.
  */
 export async function GET() {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("lihat-tim");
+  if (!izin.ok) return izin.response;
+  const sesi = { user: izin.user, source: "cookie" as const };
 
   const members = await getTeam();
 

@@ -8,6 +8,7 @@ import ProjectDeleteDialog from "@/components/ProjectDeleteDialog";
 import ProjectEditModal from "@/components/ProjectEditModal";
 import { SEMUA, type Semua, filterProjects } from "@/lib/filters";
 import { formatMarginPct, projectMargin } from "@/lib/finance";
+import { can, canEditProject, isFinanceField } from "@/lib/permissions";
 import {
   PROJECT_COLUMNS,
   type ColumnKey,
@@ -19,7 +20,13 @@ import {
   toggleColumn,
 } from "@/lib/table-columns";
 import type { FilterOptions } from "@/lib/api";
-import type { Project, ProjectPriority, ProjectStatus, ProjectType } from "@/lib/types";
+import type {
+  AccessLevel,
+  Project,
+  ProjectPriority,
+  ProjectStatus,
+  ProjectType,
+} from "@/lib/types";
 import {
   SORT_KEYS,
   SORT_LABELS,
@@ -61,15 +68,20 @@ const selectClass =
 
 const labelClass = "flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2";
 
+export type Viewer = { id: number; accessLevel: AccessLevel };
+
 export default function ProjectTable({
   projects,
   options,
   initialType = SEMUA,
+  viewer,
 }: {
   projects: Project[];
   options: FilterOptions;
   /** Filter jenis awal, mis. saat datang dari halaman kelola jenis. */
   initialType?: ProjectType | Semua;
+  /** Pengguna yang sedang melihat; menentukan kolom dan tombol yang tampil. */
+  viewer: Viewer;
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<ProjectStatus | Semua>(SEMUA);
@@ -85,7 +97,19 @@ export default function ProjectTable({
      localStorage di sana — dan susunan bawaan yang dipakai sampai hidrasi. */
   const tersimpan = useSyncExternalStore(subscribeColumns, columnsSnapshot, serverColumns);
   const kolom = tersimpan ?? defaultColumns();
-  const tampil = (key: ColumnKey) => kolom[key];
+
+  /* Kolom keuangan disaring dari daftar pilihan, bukan sekadar tidak dirender:
+     kalau hanya selnya yang disembunyikan, pemilih kolom tetap menawarkannya
+     dan orang akan mengira datanya hilang. Penegakan sesungguhnya tetap di
+     server — balasan API pun tidak membawanya. */
+  const bolehKeuangan = can(viewer.accessLevel, "lihat-keuangan");
+  // Anggota boleh menyunting proyeknya sendiri, tapi menghapus bukan haknya.
+  const bolehHapus = can(viewer.accessLevel, "hapus-proyek");
+  const kolomTersedia = bolehKeuangan
+    ? PROJECT_COLUMNS
+    : PROJECT_COLUMNS.filter((c) => !isFinanceField(c.key === "nilai" ? "value" : c.key));
+  const tampil = (key: ColumnKey) =>
+    kolom[key] && kolomTersedia.some((c) => c.key === key);
 
   // Dibaca ulang dari props supaya dialog ikut menampilkan hasil simpan terakhir.
   const editing = projects.find((p) => p.id === editId) ?? null;
@@ -210,15 +234,15 @@ export default function ProjectTable({
              tabel — tampilan kartu di ponsel tidak punya kolom. */}
           <details className="relative hidden md:block">
             <summary className="cursor-pointer list-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted marker:content-none hover:bg-background">
-              Kolom ({PROJECT_COLUMNS.filter((c) => tampil(c.key)).length}/
-              {PROJECT_COLUMNS.length})
+              Kolom ({kolomTersedia.filter((c) => tampil(c.key)).length}/
+              {kolomTersedia.length})
             </summary>
             <div className="absolute right-0 z-10 mt-1 w-56 rounded-lg border border-border bg-surface p-2 shadow-card">
               <fieldset>
                 <legend className="px-1 pb-1 text-xs text-muted">
                   Kolom yang ditampilkan
                 </legend>
-                {PROJECT_COLUMNS.map((c) => (
+                {kolomTersedia.map((c) => (
                   <label
                     key={c.key}
                     className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-background"
@@ -248,7 +272,9 @@ export default function ProjectTable({
         <div className="flex items-center gap-2">
           {/* Ekspor mengikuti hasil saring dan urutan di layar — itu yang
              sedang dilihat orang saat menekannya. */}
-          <ExportMenu scope="proyek" ids={rows.map((p) => p.id)} />
+          {can(viewer.accessLevel, "ekspor") && (
+            <ExportMenu scope="proyek" ids={rows.map((p) => p.id)} />
+          )}
         {aktifCount > 0 && (
           <button
             type="button"
@@ -276,7 +302,7 @@ export default function ProjectTable({
               pemilih kolom. */}
           <table
             className={`w-full text-sm ${
-              PROJECT_COLUMNS.filter((c) => tampil(c.key)).length >= 6 ? "min-w-[52rem]" : ""
+              kolomTersedia.filter((c) => tampil(c.key)).length >= 6 ? "min-w-[52rem]" : ""
             }`}
           >
             <caption className="sr-only">
@@ -287,7 +313,7 @@ export default function ProjectTable({
                 <th scope="col" className="px-4 py-3 font-medium">
                   Proyek
                 </th>
-                {PROJECT_COLUMNS.filter((c) => tampil(c.key)).map((c) => (
+                {kolomTersedia.filter((c) => tampil(c.key)).map((c) => (
                   <th key={c.key} scope="col" className="px-4 py-3 font-medium">
                     {c.label}
                   </th>
@@ -366,20 +392,24 @@ export default function ProjectTable({
                   {tampil("margin") && <MarginCell project={p} />}
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditId(p.id)}
-                        className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:bg-surface"
-                      >
-                        Edit<span className="sr-only"> {p.name}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHapusId(p.id)}
-                        className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:border-high/30 hover:bg-high/10 hover:text-high"
-                      >
-                        Hapus<span className="sr-only"> {p.name}</span>
-                      </button>
+                      {canEditProject(viewer, p) && (
+                        <button
+                          type="button"
+                          onClick={() => setEditId(p.id)}
+                          className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:bg-surface"
+                        >
+                          Edit<span className="sr-only"> {p.name}</span>
+                        </button>
+                      )}
+                      {bolehHapus && canEditProject(viewer, p) && (
+                        <button
+                          type="button"
+                          onClick={() => setHapusId(p.id)}
+                          className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:border-high/30 hover:bg-high/10 hover:text-high"
+                        >
+                          Hapus<span className="sr-only"> {p.name}</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -444,22 +474,26 @@ export default function ProjectTable({
                 )}
               </dl>
 
-              <div className="mt-3 flex gap-2 border-t border-border pt-3">
-                <button
-                  type="button"
-                  onClick={() => setEditId(p.id)}
-                  className="flex-1 rounded-lg border border-border px-2.5 py-2 text-sm text-muted hover:bg-background"
-                >
-                  Edit<span className="sr-only"> {p.name}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHapusId(p.id)}
-                  className="flex-1 rounded-lg border border-border px-2.5 py-2 text-sm text-muted hover:border-high/30 hover:bg-high/10 hover:text-high"
-                >
-                  Hapus<span className="sr-only"> {p.name}</span>
-                </button>
-              </div>
+              {canEditProject(viewer, p) && (
+                <div className="mt-3 flex gap-2 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditId(p.id)}
+                    className="flex-1 rounded-lg border border-border px-2.5 py-2 text-sm text-muted hover:bg-background"
+                  >
+                    Edit<span className="sr-only"> {p.name}</span>
+                  </button>
+                  {bolehHapus && (
+                    <button
+                      type="button"
+                      onClick={() => setHapusId(p.id)}
+                      className="flex-1 rounded-lg border border-border px-2.5 py-2 text-sm text-muted hover:border-high/30 hover:bg-high/10 hover:text-high"
+                    >
+                      Hapus<span className="sr-only"> {p.name}</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -472,6 +506,7 @@ export default function ProjectTable({
           key={editing.id}
           project={editing}
           options={options}
+          bolehKeuangan={bolehKeuangan}
           onClose={() => setEditId(null)}
         />
       )}

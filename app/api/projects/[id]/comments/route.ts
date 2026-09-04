@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createComment, getComments, getProject } from "@/lib/api";
-import { requireSession } from "@/lib/auth";
-import { unauthorized } from "@/lib/auth-response";
+import { jagaRute } from "@/lib/api-guard";
 import { validateComment } from "@/lib/comment-form";
 
 /**
@@ -29,8 +28,9 @@ const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 200;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("lihat-detail");
+  if (!izin.ok) return izin.response;
+  const sesi = { user: izin.user };
 
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
@@ -62,8 +62,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("kolaborasi");
+  if (!izin.ok) return izin.response;
+  const sesi = { user: izin.user };
 
   const id = await bacaId(params);
   if (id === null) return idTidakValid;

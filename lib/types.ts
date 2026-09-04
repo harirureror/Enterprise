@@ -92,12 +92,33 @@ export type ProjectTypeInfo = {
   sortOrder: number;
 };
 
+/**
+ * Tingkat akses aplikasi. Sengaja TERPISAH dari `role` yang berisi jabatan
+ * bebas ("Project Manager"): kalau keduanya satu kolom, mengganti jabatan
+ * seseorang akan diam-diam mengganti haknya juga.
+ *
+ * Definisi kemampuan tiap tingkat ada di lib/permissions.ts.
+ */
+export type AccessLevel = "Admin" | "Owner" | "HR" | "Manager" | "Anggota";
+export const ACCESS_LEVELS: AccessLevel[] = ["Admin", "Owner", "HR", "Manager", "Anggota"];
+
+/** Jenis kegiatan di agenda tim — inti dari "orangnya lagi di mana". */
+export type AgendaKind = "Lapangan" | "Kantor" | "Perjalanan" | "Cuti";
+export const AGENDA_KINDS: AgendaKind[] = ["Lapangan", "Kantor", "Perjalanan", "Cuti"];
+
 export type User = {
   id: number;
   name: string;
   email: string;
   avatarUrl: string | null;
+  /** Jabatan, teks bebas. Bukan penentu hak akses — lihat `accessLevel`. */
   role: string;
+  accessLevel: AccessLevel;
+  /**
+   * Akun nonaktif tidak bisa masuk, tapi barisnya tetap ada supaya namanya
+   * masih melekat di proyek, komentar, dan riwayat yang pernah dia buat.
+   */
+  isActive: boolean;
 };
 
 export type Project = {
@@ -237,6 +258,30 @@ export type ProjectComment = {
   createdAt: string;
   /** Stempel waktu penuh, untuk mengurutkan komentar di hari yang sama. */
   postedAt: string;
+};
+
+/**
+ * Satu baris agenda: siapa, kapan, sedang apa, dan di mana.
+ *
+ * `userId` adalah orang yang menjalani; `createdBy` yang mencatat. Keduanya
+ * dipisah karena Manager boleh mengisikan agenda untuk anggotanya.
+ */
+export type AgendaEntry = {
+  id: number;
+  /** Orang yang menjalani agenda ini. */
+  userId: number;
+  /** Proyek terkait; `null` untuk agenda non-proyek seperti cuti atau kantor. */
+  projectId: number | null;
+  kind: AgendaKind;
+  /** ISO date (YYYY-MM-DD), inklusif di kedua ujungnya. */
+  startDate: string;
+  endDate: string;
+  locationCity: string;
+  locationProvince: string;
+  note: string;
+  /** Siapa yang mencatat; bisa berbeda dari `userId`. */
+  createdBy: number;
+  updatedAt: string;
 };
 
 /**

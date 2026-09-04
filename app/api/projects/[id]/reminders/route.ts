@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createReminder, getCurrentUser, getReminderStatus, getReminders, getProject } from "@/lib/api";
+import { jagaRute } from "@/lib/api-guard";
+import { createReminder, getReminderStatus, getReminders, getProject } from "@/lib/api";
 import { validateReminder } from "@/lib/reminder-form";
 
 /**
@@ -24,6 +25,9 @@ const idTidakValid = NextResponse.json(
 const tidakDitemukan = NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("lihat-detail");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
   if (!(await getProject(id))) return tidakDitemukan;
@@ -36,6 +40,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("kolaborasi");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
   if (!(await getProject(id))) return tidakDitemukan;
@@ -62,7 +69,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // ponytail: pengirim diambil dari sesi setelah fase autentikasi.
-  const pengirim = await getCurrentUser();
+  // Pengirimnya pengguna sesi, bukan pengguna pertama.
+  const pengirim = izin.user;
   const reminder = await createReminder({
     projectId: id,
     fromUserId: pengirim.id,

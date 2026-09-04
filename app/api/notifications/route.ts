@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getNotifications, getReminderStatusMap } from "@/lib/api";
 import { KIND_LABELS, type NotificationKind, type NotificationSeverity } from "@/lib/notifications";
 
@@ -17,6 +18,9 @@ import { KIND_LABELS, type NotificationKind, type NotificationSeverity } from "@
 const SEVERITIES: NotificationSeverity[] = ["tinggi", "sedang", "info"];
 
 export async function GET(request: NextRequest) {
+  const izin = await jagaRute("lihat-notifikasi");
+  if (!izin.ok) return izin.response;
+
   const params = request.nextUrl.searchParams;
   const invalid: string[] = [];
 

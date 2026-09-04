@@ -42,13 +42,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p className="truncate text-xs text-muted">Jaya Survei Indonesia</p>
           </div>
         </div>
-        <SidebarNav notifications={feed.items} />
+        <SidebarNav notifications={feed.items} accessLevel={currentUser.accessLevel} />
       </aside>
 
       <div className="lg:ml-[280px]">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur-md sm:px-6 lg:justify-end lg:px-8">
           <div className="flex items-center gap-2 lg:hidden">
-            <MobileNav notifications={feed.items} />
+            <MobileNav notifications={feed.items} accessLevel={currentUser.accessLevel} />
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-mark text-sm font-bold text-on-mark">
               DE
             </span>

@@ -10,12 +10,15 @@ import { seed } from "./seed";
 import {
   comments as mockComments,
   progressHistory as mockProgress,
+  agenda as mockAgenda,
   projects as mockProjects,
   reminderSchedules as mockSchedules,
   reminders as mockReminders,
   users as mockUsers,
 } from "../mock-data";
 import {
+  ACCESS_LEVELS,
+  AGENDA_KINDS,
   CLIENT_TIERS,
   PAYMENT_TERMS,
   PENALTY_RISKS,
@@ -60,6 +63,7 @@ assert.ok(tabel.includes("comments"));
 assert.ok(tabel.includes("sessions"));
 assert.ok(tabel.includes("user_preferences"));
 assert.ok(tabel.includes("project_dependencies"));
+assert.ok(tabel.includes("agenda"));
 // Notifikasi sengaja tidak punya tabel sendiri: isinya dihitung dari keadaan proyek.
 assert.equal(tabel.includes("notifications"), false);
 
@@ -802,6 +806,181 @@ if (tanpaKontrak) {
 }
 
 assert.ok(indeks.includes("idx_projects_contract_no"));
+
+
+/* --- Tingkat akses pengguna (migrasi 13) ----------------------------------- */
+
+const kolomUser = db
+  .prepare("PRAGMA table_info(users)")
+  .all()
+  .map((r) => String(r.name));
+// Ditambahkan lewat ALTER TABLE, jadi letaknya di paling belakang.
+assert.deepEqual(kolomUser.slice(-2), ["access_level", "is_active"]);
+
+// Baris tanpa kedua kolom itu tetap bisa masuk, dan dapat hak paling kecil.
+db.exec(
+  `INSERT INTO users (id, email, name, role) VALUES (970, 'baru@uji.co.id', 'Baru', 'Staf')`
+);
+const bawaanUser = db.prepare("SELECT access_level, is_active FROM users WHERE id = 970").get()!;
+// Menebak lebih tinggi berarti memberi akses yang belum pernah diputuskan orang.
+assert.equal(bawaanUser.access_level, "Anggota");
+assert.equal(bawaanUser.is_active, 1);
+db.exec("DELETE FROM users WHERE id = 970");
+
+// Tingkat akses enum tertutup; daftarnya diambil dari konstanta TypeScript
+// supaya CHECK tidak bisa melenceng dari union tanpa ketahuan.
+ACCESS_LEVELS.forEach((l, i) => {
+  db.exec(
+    `INSERT INTO users (id, email, name, role, access_level)
+     VALUES (${971 + i}, 'akses${i}@uji.co.id', 'Uji ${l}', 'Staf', '${l}')`
+  );
+});
+assert.equal(
+  hitung("SELECT COUNT(*) AS n FROM users WHERE id BETWEEN 971 AND 979"),
+  ACCESS_LEVELS.length
+);
+db.exec("DELETE FROM users WHERE id BETWEEN 971 AND 979");
+
+tolak(
+  `INSERT INTO users (email, name, role, access_level)
+   VALUES ('x@uji.co.id', 'X', 'Staf', 'Superadmin')`,
+  "constraint"
+);
+tolak(
+  `INSERT INTO users (email, name, role, access_level)
+   VALUES ('x@uji.co.id', 'X', 'Staf', 'admin')`,
+  "constraint"
+);
+// is_active hanya 0 atau 1, bukan sembarang angka.
+tolak(
+  `INSERT INTO users (email, name, role, is_active)
+   VALUES ('x@uji.co.id', 'X', 'Staf', 2)`,
+  "constraint"
+);
+
+const indeksUser = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'users'")
+  .all()
+  .map((r) => String(r.name));
+assert.ok(indeksUser.includes("idx_users_access_level"));
+
+// Data seed membawa tingkat aksesnya, bukan jatuh ke bawaan.
+assert.equal(
+  db.prepare(`SELECT access_level FROM users WHERE id = ${mockUsers[0].id}`).get()!.access_level,
+  mockUsers[0].accessLevel
+);
+// Minimal satu admin aktif, kalau tidak aplikasinya tidak bisa dikelola siapa pun.
+assert.ok(hitung("SELECT COUNT(*) AS n FROM users WHERE access_level = 'Admin' AND is_active = 1") >= 1);
+
+/* --- Agenda tim (migrasi 14) ----------------------------------------------- */
+
+const kolomAgenda = db
+  .prepare("PRAGMA table_info(agenda)")
+  .all()
+  .map((r) => String(r.name));
+assert.deepEqual(kolomAgenda, [
+  "id",
+  "user_id",
+  "project_id",
+  "kind",
+  "start_date",
+  "end_date",
+  "location_city",
+  "location_province",
+  "note",
+  "created_by",
+  "created_at",
+  "updated_at",
+]);
+
+assert.equal(hitung("SELECT COUNT(*) AS n FROM agenda"), mockAgenda.length);
+
+// Jenis kegiatan enum tertutup, diambil dari konstanta TypeScript.
+AGENDA_KINDS.forEach((k, i) => {
+  db.exec(
+    `INSERT INTO agenda (id, user_id, kind, start_date, end_date, created_by)
+     VALUES (${980 + i}, 1, '${k}', '2026-09-01', '2026-09-02', 1)`
+  );
+});
+assert.equal(
+  hitung("SELECT COUNT(*) AS n FROM agenda WHERE id BETWEEN 980 AND 989"),
+  AGENDA_KINDS.length
+);
+db.exec("DELETE FROM agenda WHERE id BETWEEN 980 AND 989");
+
+tolak(
+  `INSERT INTO agenda (user_id, kind, start_date, end_date, created_by)
+   VALUES (1, 'Libur', '2026-09-01', '2026-09-02', 1)`,
+  "constraint"
+);
+
+// Tanggal selesai tidak boleh mendahului tanggal mulai — aturan yang sama
+// dijaga validasi aplikasi di lib/agenda-form.ts.
+tolak(
+  `INSERT INTO agenda (user_id, kind, start_date, end_date, created_by)
+   VALUES (1, 'Kantor', '2026-09-05', '2026-09-01', 1)`,
+  "constraint"
+);
+// Sehari penuh sah.
+db.exec(
+  `INSERT INTO agenda (id, user_id, kind, start_date, end_date, created_by)
+   VALUES (990, 1, 'Kantor', '2026-09-01', '2026-09-01', 1)`
+);
+db.exec("DELETE FROM agenda WHERE id = 990");
+
+// Tanggal wajib berbentuk ISO.
+tolak(
+  `INSERT INTO agenda (user_id, kind, start_date, end_date, created_by)
+   VALUES (1, 'Kantor', '01-09-2026', '02-09-2026', 1)`,
+  "constraint"
+);
+
+// Menunjuk orang atau pencatat yang tidak ada ditolak foreign key.
+tolak(
+  `INSERT INTO agenda (user_id, kind, start_date, end_date, created_by)
+   VALUES (99999, 'Kantor', '2026-09-01', '2026-09-02', 1)`,
+  "foreign key"
+);
+tolak(
+  `INSERT INTO agenda (user_id, kind, start_date, end_date, created_by)
+   VALUES (1, 'Kantor', '2026-09-01', '2026-09-02', 99999)`,
+  "foreign key"
+);
+
+// Proyek dihapus: agendanya TETAP ADA dengan project_id NULL. Orangnya memang
+// pernah pergi ke sana, dan jejak itu yang dicari HR.
+db.exec(
+  `INSERT INTO projects (id, name, type, status, priority, start_date, deadline, owner_id)
+   VALUES (995, 'Proyek beragenda', 'Jasa', 'Berjalan', 'Rendah', '2026-09-01', '2026-09-30', 1)`
+);
+db.exec(
+  `INSERT INTO agenda (id, user_id, project_id, kind, start_date, end_date, created_by)
+   VALUES (996, 1, 995, 'Lapangan', '2026-09-01', '2026-09-02', 1)`
+);
+db.exec("DELETE FROM projects WHERE id = 995");
+const yatim = db.prepare("SELECT project_id FROM agenda WHERE id = 996").get();
+assert.ok(yatim, "agenda ikut terhapus bersama proyeknya");
+assert.equal(yatim.project_id, null);
+
+// Sebaliknya, pengguna dihapus: agendanya ikut hilang (CASCADE) karena tanpa
+// orangnya baris itu tidak berarti apa-apa.
+db.exec(
+  `INSERT INTO users (id, email, name, role) VALUES (997, 'sekali@uji.co.id', 'Sekali', 'Staf')`
+);
+db.exec(
+  `INSERT INTO agenda (id, user_id, kind, start_date, end_date, created_by)
+   VALUES (998, 997, 'Cuti', '2026-09-01', '2026-09-02', 1)`
+);
+db.exec("DELETE FROM users WHERE id = 997");
+assert.equal(hitung("SELECT COUNT(*) AS n FROM agenda WHERE id = 998"), 0);
+db.exec("DELETE FROM agenda WHERE id = 996");
+
+const indeksAgenda = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'agenda'")
+  .all()
+  .map((r) => String(r.name));
+assert.ok(indeksAgenda.includes("idx_agenda_user"));
+assert.ok(indeksAgenda.includes("idx_agenda_rentang"));
 
 const indeksRiwayat = db
   .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'progress_history'")

@@ -2,6 +2,7 @@ import StatCard from "@/components/StatCard";
 import TeamList from "@/components/TeamList";
 import { getTeam } from "@/lib/api";
 import { formatCurrencyShort } from "@/lib/ui";
+import { requireAbility } from "@/lib/auth";
 
 // Beban kerja berubah tiap proyek berpindah tangan, jadi jangan dicache.
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ export const metadata = {
 };
 
 export default async function TimPage() {
+  await requireAbility("lihat-tim");
+
   const members = await getTeam();
 
   const aktif = members.reduce((sum, m) => sum + m.activeCount, 0);

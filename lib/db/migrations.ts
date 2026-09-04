@@ -448,4 +448,59 @@ export const migrations: Migration[] = [
       ALTER TABLE projects ADD COLUMN location_province TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    id: 13,
+    name: "tingkat-akses-pengguna",
+    up: `
+      -- Tingkat akses sengaja kolom sendiri, bukan memakai ulang kolom role.
+      -- role berisi jabatan bebas ("Project Manager"); kalau keduanya jadi satu,
+      -- mengganti jabatan seseorang akan diam-diam mengganti haknya juga.
+      --
+      -- DEFAULT 'Anggota': hak paling kecil untuk baris lama. Menebak lebih
+      -- tinggi berarti memberi akses yang belum pernah diputuskan orang.
+      ALTER TABLE users ADD COLUMN access_level TEXT NOT NULL DEFAULT 'Anggota'
+        CHECK (access_level IN ('Admin', 'Owner', 'HR', 'Manager', 'Anggota'));
+
+      -- Akun dinonaktifkan, bukan dihapus: namanya harus tetap melekat di
+      -- proyek, komentar, dan riwayat progres yang pernah dia buat.
+      ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1
+        CHECK (is_active IN (0, 1));
+
+      CREATE INDEX idx_users_access_level ON users(access_level);
+    `,
+  },
+  {
+    id: 14,
+    name: "agenda-tim",
+    up: `
+      -- Agenda tim: siapa, kapan, sedang apa, dan di mana. Dipakai HR untuk
+      -- tahu posisi orang, dan ikut jadi satu bagian di laporan mingguan.
+      CREATE TABLE agenda (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        -- Orang yang menjalani agenda ini.
+        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        -- SET NULL, bukan CASCADE: orangnya tetap pernah pergi ke sana walau
+        -- proyeknya kemudian dihapus, dan jejak itu yang dicari HR.
+        project_id    INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        kind          TEXT NOT NULL
+                        CHECK (kind IN ('Lapangan', 'Kantor', 'Perjalanan', 'Cuti')),
+        start_date    TEXT NOT NULL CHECK (start_date LIKE '____-__-__'),
+        end_date      TEXT NOT NULL CHECK (end_date LIKE '____-__-__'),
+        location_city     TEXT NOT NULL DEFAULT '',
+        location_province TEXT NOT NULL DEFAULT '',
+        note          TEXT NOT NULL DEFAULT '',
+        -- Manager boleh mengisikan untuk anggotanya, jadi "siapa yang mencatat"
+        -- berbeda dari "siapa yang menjalani" dan keduanya perlu disimpan.
+        created_by    INTEGER NOT NULL REFERENCES users(id),
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        -- Aturan yang sama dijaga validasi aplikasi di lib/agenda-form.ts.
+        CHECK (end_date >= start_date)
+      );
+
+      -- Dua arah baca yang berbeda: "agenda si A" dan "siapa saja pekan ini".
+      CREATE INDEX idx_agenda_user ON agenda(user_id, start_date);
+      CREATE INDEX idx_agenda_rentang ON agenda(start_date, end_date);
+    `,
+  },
 ];

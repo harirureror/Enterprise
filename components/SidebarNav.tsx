@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import type { Notification } from "@/lib/notifications";
+import { type Ability, can } from "@/lib/permissions";
+import type { AccessLevel } from "@/lib/types";
 import {
   readStateSnapshot,
   serverReadState,
@@ -18,16 +20,24 @@ const icons: Record<string, string> = {
   jenis: "M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z",
   timeline: "M3 6h11v3H3V6zm4 4.5h13v3H7v-3zM3 15h9v3H3v-3z",
   tim: "M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-2.7 0-8 1.3-8 4v3h9v-3c0-1 .4-2.1 1.3-3-.8-.1-1.6-.2-2.3-.2zm8 0c-.3 0-.7 0-1.1.1A5 5 0 0 1 17 16v3h7v-3c0-2.7-5.3-4-8-4z",
+  agenda: "M7 2v2H4a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3V2h-2v2H9V2H7zm12 7v10H5V9h14zM7 11v2h2v-2H7zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z",
+  pengguna: "M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-8 1.7-8 4.5V21h16v-2.5c0-2.8-4.7-4.5-8-4.5z",
   lonceng: "M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5.5-1.5-2V10a5.5 5.5 0 0 0-4-5.3V4a1.5 1.5 0 0 0-3 0v.7A5.5 5.5 0 0 0 6.5 10v4.5L5 16.5V18h14v-1.5z",
 };
 
-const NAV = [
-  { href: "/", label: "Overview", icon: "dashboard" },
-  { href: "/proyek", label: "Daftar Proyek", icon: "daftar" },
-  { href: "/proyek/jenis", label: "Jenis Proyek", icon: "jenis" },
-  { href: "/timeline", label: "Timeline", icon: "timeline" },
-  { href: "/notifikasi", label: "Notifikasi", icon: "lonceng" },
-  { href: "/tim", label: "Tim", icon: "tim" },
+/* Tiap menu membawa kemampuan yang mensyaratkannya, lalu daftarnya disaring
+   sesuai tingkat akses. Menyembunyikan menu bukan kontrol keamanan — halaman
+   dan server action punya penjaganya sendiri — tapi menampilkan menu yang
+   ujungnya memantulkan orang kembali itu membingungkan. */
+const NAV: { href: string; label: string; icon: string; ability: Ability }[] = [
+  { href: "/", label: "Overview", icon: "dashboard", ability: "lihat-overview" },
+  { href: "/proyek", label: "Daftar Proyek", icon: "daftar", ability: "lihat-daftar" },
+  { href: "/proyek/jenis", label: "Jenis Proyek", icon: "jenis", ability: "kelola-jenis" },
+  { href: "/timeline", label: "Timeline", icon: "timeline", ability: "lihat-daftar" },
+  { href: "/agenda", label: "Agenda", icon: "agenda", ability: "lihat-agenda" },
+  { href: "/notifikasi", label: "Notifikasi", icon: "lonceng", ability: "lihat-notifikasi" },
+  { href: "/tim", label: "Tim", icon: "tim", ability: "lihat-tim" },
+  { href: "/admin/pengguna", label: "Pengguna", icon: "pengguna", ability: "kelola-pengguna" },
 ];
 
 /* Lencana jumlah belum dibaca dihitung di klien: daftarnya datang dari server,
@@ -36,13 +46,17 @@ const NAV = [
    ditampilkan penuh lalu menyusut setelah hidrasi. */
 export default function SidebarNav({
   notifications = [],
+  accessLevel,
   onNavigate,
 }: {
   notifications?: Notification[];
+  /** Tingkat akses pengguna yang sedang masuk; menentukan menu mana yang tampil. */
+  accessLevel: AccessLevel;
   /** Dipanggil setelah menu diklik — dipakai laci mobile untuk menutup diri. */
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const menu = NAV.filter((m) => can(accessLevel, m.ability));
   const read = useSyncExternalStore(subscribeReadState, readStateSnapshot, serverReadState);
   const belumDibaca = read === null ? 0 : unreadCount(notifications, read);
 
@@ -52,7 +66,7 @@ export default function SidebarNav({
       // Di laci mobile dan di sidebar desktop sama-sama menumpuk vertikal.
       className="flex flex-col gap-1 lg:mt-6"
     >
-      {NAV.map(({ href, label, icon }) => {
+      {menu.map(({ href, label, icon }) => {
         const active = pathname === href;
         return (
           <Link

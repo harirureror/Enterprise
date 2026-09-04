@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { jagaSesi } from "@/lib/api-guard";
 import { type NextRequest, NextResponse } from "next/server";
 import { getMemberProfile, updateUser } from "@/lib/api";
 import { getSession } from "@/lib/auth";
@@ -15,6 +16,9 @@ import { validateProfile } from "@/lib/profile-form";
  */
 
 export async function GET() {
+  const izin = await jagaSesi();
+  if (!izin.ok) return izin.response;
+
   const sesi = await getSession();
   if (!sesi) return unauthorized();
 
@@ -45,6 +49,9 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const izin = await jagaSesi();
+  if (!izin.ok) return izin.response;
+
   const sesi = await getSession();
   if (!sesi) return unauthorized();
 

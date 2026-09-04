@@ -50,12 +50,19 @@ export default function ProjectFields({
   errors,
   options,
   onChange,
+  bolehKeuangan = true,
 }: {
   prefix: string;
   draft: ProjectDraft;
   errors: DraftErrors;
   options: FilterOptions;
   onChange: (field: DraftField, value: string) => void;
+  /**
+   * Boleh melihat dan mengisi angka keuangan? Kalau tidak, seluruh blok
+   * kontrak disembunyikan — dan karena draft-nya berasal dari proyek yang
+   * sudah ada, nilai yang tersimpan tetap utuh saat disimpan ulang.
+   */
+  bolehKeuangan?: boolean;
 }) {
   const errId = (field: DraftField) => `${prefix}-${field}-error`;
 
@@ -395,6 +402,7 @@ export default function ProjectFields({
 
       {/* Sisi kontrak dan uang dikumpulkan di satu blok supaya margin bisa
          ditampilkan tepat di bawah angka-angka yang membentuknya. */}
+      {bolehKeuangan && (
       <fieldset className="mt-2 border-t border-border pt-4">
         <legend className="sr-only">Detail kontrak dan keuangan</legend>
         <p className="mb-3 text-label-caps text-muted uppercase">Kontrak &amp; keuangan</p>
@@ -584,6 +592,7 @@ export default function ProjectFields({
           </div>
         </div>
       </fieldset>
+      )}
     </div>
   );
 }

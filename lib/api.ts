@@ -3,6 +3,8 @@ import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
   isActiveStatus,
+  type AccessLevel,
+  type AgendaEntry,
   type ProgressEntry,
   type Project,
   type ProjectPriority,
@@ -38,8 +40,10 @@ import {
   nextOccurrence,
 } from "./reminder-schedule";
 import {
+  agenda as mockAgenda,
   comments as mockComments,
   currentUser as mockCurrentUser,
+  credentials as mockCredentials,
   progressHistory as mockProgress,
   projectDependencies as mockDependencies,
   projectTypes as mockTypes,
@@ -395,8 +399,14 @@ export async function deleteProject(id: number): Promise<boolean> {
   return true;
 }
 
-export async function getUsers(): Promise<User[]> {
-  return mockUsers;
+/**
+ * Daftar anggota. `activeOnly` dipakai tempat yang menawarkan pilihan orang
+ * (mis. dropdown PIC): akun nonaktif tidak boleh dipilih lagi, tapi tetap harus
+ * muncul di proyek lama yang dia pegang — jadi penyaringannya di pemanggil,
+ * bukan di sini secara diam-diam.
+ */
+export async function getUsers(options: { activeOnly?: boolean } = {}): Promise<User[]> {
+  return options.activeOnly ? mockUsers.filter((u) => u.isActive) : mockUsers;
 }
 
 export async function getCurrentUser(): Promise<User> {
@@ -927,4 +937,142 @@ export async function getFilterOptions(): Promise<FilterOptions> {
       .map((u) => ({ id: u.id, name: u.name, projects: jumlah.get(u.id)! }))
       .sort((a, b) => a.name.localeCompare(b.name, "id")),
   };
+}
+
+
+/* --- Kelola pengguna (Admin) ---------------------------------------------- */
+
+export type UserInput = {
+  name: string;
+  email: string;
+  role: string;
+  accessLevel: AccessLevel;
+};
+
+/** Email sudah dipakai? Tanpa memandang huruf besar-kecil, sejalan dengan
+    idx_users_email_lower di skema. `kecuali` untuk mengabaikan diri sendiri. */
+export async function emailTerpakai(email: string, kecuali?: number): Promise<boolean> {
+  const alamat = email.trim().toLowerCase();
+  return mockUsers.some((u) => u.id !== kecuali && u.email.toLowerCase() === alamat);
+}
+
+/** Berapa admin yang masih aktif. Dipakai menjaga admin terakhir. */
+export async function jumlahAdminAktif(): Promise<number> {
+  return mockUsers.filter((u) => u.isActive && u.accessLevel === "Admin").length;
+}
+
+export async function createUser(input: UserInput, passwordHash: string): Promise<User | null> {
+  if (await emailTerpakai(input.email)) return null;
+
+  const id = mockUsers.reduce((max, u) => Math.max(max, u.id), 0) + 1;
+  const user: User = {
+    id,
+    name: input.name.trim(),
+    email: input.email.trim(),
+    avatarUrl: null,
+    role: input.role.trim(),
+    accessLevel: input.accessLevel,
+    isActive: true,
+  };
+  mockUsers.push(user);
+  mockCredentials.push({ userId: id, passwordHash, devOnly: false });
+  return user;
+}
+
+export async function setUserAccessLevel(id: number, level: AccessLevel): Promise<User | null> {
+  const index = mockUsers.findIndex((u) => u.id === id);
+  if (index === -1) return null;
+
+  const user: User = { ...mockUsers[index], accessLevel: level };
+  mockUsers[index] = user;
+  return user;
+}
+
+export async function setUserActive(id: number, aktif: boolean): Promise<User | null> {
+  const index = mockUsers.findIndex((u) => u.id === id);
+  if (index === -1) return null;
+
+  const user: User = { ...mockUsers[index], isActive: aktif };
+  mockUsers[index] = user;
+  return user;
+}
+
+/** Ganti hash sandi. Membuat kredensial baru kalau akunnya belum punya. */
+export async function setUserPassword(id: number, passwordHash: string): Promise<boolean> {
+  if (!mockUsers.some((u) => u.id === id)) return false;
+
+  const index = mockCredentials.findIndex((c) => c.userId === id);
+  if (index === -1) mockCredentials.push({ userId: id, passwordHash, devOnly: false });
+  else mockCredentials[index] = { userId: id, passwordHash, devOnly: false };
+  return true;
+}
+
+/* --- Agenda tim ------------------------------------------------------------ */
+
+export type AgendaView = AgendaEntry & {
+  /** Orang yang menjalani; `null` kalau akunnya sudah tidak ada. */
+  user: User | null;
+  /** Proyek terkait; `null` untuk agenda non-proyek atau proyek yang dihapus. */
+  project: Project | null;
+};
+
+function lengkapiAgenda(entry: AgendaEntry, users: User[], projects: Project[]): AgendaView {
+  return {
+    ...entry,
+    user: users.find((u) => u.id === entry.userId) ?? null,
+    project: entry.projectId === null ? null : projects.find((p) => p.id === entry.projectId) ?? null,
+  };
+}
+
+/**
+ * Agenda, terurut dari yang paling awal. Rentang tanggalnya opsional; tanpa itu
+ * seluruh agenda dikembalikan.
+ */
+export async function getAgenda(
+  filter: { start?: string; end?: string; userId?: number } = {}
+): Promise<AgendaView[]> {
+  const users = await getUsers();
+  const projects = await getProjects();
+
+  return mockAgenda
+    .filter((a) => {
+      if (filter.userId !== undefined && a.userId !== filter.userId) return false;
+      // Beririsan, bukan termuat seluruhnya: agenda yang mulai pekan lalu dan
+      // berakhir pekan ini tetap harus terlihat di pekan ini.
+      if (filter.end !== undefined && a.startDate > filter.end) return false;
+      if (filter.start !== undefined && a.endDate < filter.start) return false;
+      return true;
+    })
+    .map((a) => lengkapiAgenda(a, users, projects))
+    .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id - b.id);
+}
+
+export async function createAgenda(input: Omit<AgendaEntry, "id">): Promise<AgendaEntry> {
+  const id = mockAgenda.reduce((max, a) => Math.max(max, a.id), 0) + 1;
+  const entry: AgendaEntry = { ...input, id };
+  mockAgenda.push(entry);
+  return entry;
+}
+
+export async function updateAgenda(
+  id: number,
+  input: Omit<AgendaEntry, "id">
+): Promise<AgendaEntry | null> {
+  const index = mockAgenda.findIndex((a) => a.id === id);
+  if (index === -1) return null;
+
+  const entry: AgendaEntry = { ...input, id };
+  mockAgenda[index] = entry;
+  return entry;
+}
+
+export async function getAgendaEntry(id: number): Promise<AgendaEntry | null> {
+  return mockAgenda.find((a) => a.id === id) ?? null;
+}
+
+export async function deleteAgenda(id: number): Promise<boolean> {
+  const index = mockAgenda.findIndex((a) => a.id === id);
+  if (index === -1) return false;
+  mockAgenda.splice(index, 1);
+  return true;
 }

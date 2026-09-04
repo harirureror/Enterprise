@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getMemberProfile, getProjects } from "@/lib/api";
-import { requireSession } from "@/lib/auth";
-import { unauthorized } from "@/lib/auth-response";
+import { jagaRute } from "@/lib/api-guard";
 import { parseProjectFilter } from "@/lib/filters";
 import { isActiveStatus } from "@/lib/types";
 import { type SortKey, SORT_KEYS, sortProjects } from "@/lib/ui";
@@ -14,8 +13,8 @@ import { type SortKey, SORT_KEYS, sortProjects } from "@/lib/ui";
  * membuka peluang jawaban yang tidak sesuai URL-nya.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("lihat-tim");
+  if (!izin.ok) return izin.response;
 
   const { id } = await params;
   const angka = Number(id);

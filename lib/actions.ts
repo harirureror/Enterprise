@@ -36,7 +36,8 @@ import {
   type ReminderErrors,
   validateReminder,
 } from "@/lib/reminder-form";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, tolakKalauTakBoleh } from "@/lib/auth";
+import { canEditProject } from "@/lib/permissions";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/types";
 import {
   type DraftErrors,
@@ -71,7 +72,41 @@ async function periksa(draft: ProjectDraft): Promise<DraftErrors> {
   );
 }
 
+/* Setiap action penulis data memeriksa izinnya sendiri.
+
+   Tombolnya memang tidak dirender untuk peran yang tidak berhak, tapi tombol
+   yang tidak terlihat bukan kontrol keamanan — server action bisa dipanggil
+   langsung. Yang benar-benar menahan ada di sini. */
+
+const TIDAK_BOLEH = "Akses Anda tidak mencakup tindakan ini.";
+
+/**
+ * Penjaga untuk tindakan yang menyasar satu proyek tertentu.
+ *
+ * Memakai canEditProject(), bukan sekadar memeriksa kemampuan: Anggota boleh
+ * mengubah proyek, tapi hanya yang dia pegang. Memeriksa kemampuannya saja
+ * akan membuat Anggota bisa menyunting proyek rekannya.
+ */
+async function tolakKalauBukanHaknya(
+  projectId: number
+): Promise<{ ok: false; error: string; errors: Record<string, never> } | null> {
+  const pengguna = await getSessionUser();
+  if (!pengguna) return { ok: false, error: "Perlu masuk untuk melakukan ini.", errors: {} };
+
+  const project = await getProject(projectId);
+  if (!project) {
+    return { ok: false, error: "Proyek tidak ditemukan atau sudah dihapus.", errors: {} };
+  }
+  if (!canEditProject(pengguna, project)) {
+    return { ok: false, error: TIDAK_BOLEH, errors: {} };
+  }
+  return null;
+}
+
 export async function simpanProyek(draft: ProjectDraft): Promise<SimpanHasil> {
+  const ditolak = await tolakKalauTakBoleh("buat-proyek");
+  if (ditolak) return ditolak;
+
   const errors = await periksa(draft);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Data proyek belum valid.", errors };
@@ -84,6 +119,9 @@ export async function simpanProyek(draft: ProjectDraft): Promise<SimpanHasil> {
 
 /** Perbarui proyek yang sudah ada; aturan validasinya persis sama dengan tambah. */
 export async function perbaruiProyek(id: number, draft: ProjectDraft): Promise<SimpanHasil> {
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   const errors = await periksa(draft);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Data proyek belum valid.", errors };
@@ -107,6 +145,9 @@ export type ProgresHasil =
  * yang sedang masuk, bukan dikirim klien.
  */
 export async function catatProgres(id: number, draft: ProgressDraft): Promise<ProgresHasil> {
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   const project = await getProject(id);
   if (!project) {
     return { ok: false, error: "Proyek tidak ditemukan atau sudah dihapus.", errors: {} };
@@ -136,6 +177,9 @@ export async function catatProgres(id: number, draft: ProgressDraft): Promise<Pr
 
 /** Ganti status proyek dari halaman detail. */
 export async function ubahStatusProyek(id: number, status: string): Promise<SimpanHasil> {
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   // Nilai datang dari klien, jadi tetap dicocokkan dengan daftar status yang sah.
   if (!(PROJECT_STATUSES as string[]).includes(status)) {
     return { ok: false, error: "Status proyek tidak dikenal.", errors: {} };
@@ -156,6 +200,15 @@ export async function ubahStatusProyek(id: number, status: string): Promise<Simp
  * memang masih ada supaya klik ganda tidak melaporkan sukses palsu.
  */
 export async function hapusProyek(id: number): Promise<SimpanHasil> {
+  // Dua penjaga: boleh menghapus sama sekali, dan boleh menyentuh proyek ini.
+  // Anggota lolos penjaga kedua untuk proyeknya sendiri, tapi tetap tertahan
+  // di yang pertama — menghapus bukan haknya.
+  const tanpaHak = await tolakKalauTakBoleh("hapus-proyek");
+  if (tanpaHak) return tanpaHak;
+
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   const terhapus = await deleteProject(id);
   if (!terhapus) {
     return { ok: false, error: "Proyek tidak ditemukan atau sudah dihapus.", errors: {} };
@@ -175,6 +228,9 @@ export async function aturKetergantungan(
   id: number,
   blockedIds: number[]
 ): Promise<SimpanHasil> {
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   // Id datang dari klien: apa pun yang bukan bilangan bulat dibuang di sini,
   // sebelum sempat dicocokkan ke daftar proyek.
   const bersih = blockedIds.filter((n) => Number.isInteger(n));
@@ -204,6 +260,11 @@ export type PengingatHasil = { ok: true } | { ok: false; error: string; errors: 
 
 /** Kirim pengingat manual ke PIC proyek dari halaman detail. */
 export async function kirimPengingat(id: number, draft: ReminderDraft): Promise<PengingatHasil> {
+  // Kolaborasi, bukan hak ubah: Owner ikut lolos di sini walau tidak boleh
+  // menyentuh data proyeknya sama sekali.
+  const ditolak = await tolakKalauTakBoleh("kolaborasi");
+  if (ditolak) return ditolak;
+
   const errors = validateReminder(draft);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Pesan pengingat belum valid.", errors };
@@ -235,6 +296,11 @@ export async function aturJadwalPengingat(
   id: number,
   draft: ScheduleDraft
 ): Promise<JadwalHasil> {
+  // Memasang jadwal berulang itu mengubah setelan proyek, bukan sekadar
+  // menegur sekali — jadi ikut hak ubah, bukan hak kolaborasi.
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   const hariIni = new Date().toISOString().slice(0, 10);
   const errors = validateSchedule(draft, hariIni);
   if (Object.keys(errors).length > 0) {
@@ -257,6 +323,9 @@ export async function aturJadwalPengingat(
 
 /** Hidupkan atau matikan jadwal tanpa kehilangan setelannya. */
 export async function ubahAktifJadwal(id: number, aktif: boolean): Promise<JadwalHasil> {
+  const ditolak = await tolakKalauBukanHaknya(id);
+  if (ditolak) return ditolak;
+
   const hasil = await setScheduleActive(id, aktif);
   if (hasil === null) {
     return { ok: false, error: "Jadwal pengingat belum pernah diatur.", errors: {} };
@@ -270,6 +339,9 @@ export type KomentarHasil = { ok: true } | { ok: false; error: string; errors: C
 
 /** Tambah komentar pada sebuah proyek. Penulisnya diambil dari sesi, bukan klien. */
 export async function kirimKomentar(id: number, draft: CommentDraft): Promise<KomentarHasil> {
+  const ditolak = await tolakKalauTakBoleh("kolaborasi");
+  if (ditolak) return ditolak;
+
   const errors = validateComment(draft);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Komentar belum valid.", errors };

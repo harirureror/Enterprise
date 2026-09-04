@@ -9,7 +9,9 @@ import ProjectStatusControl from "@/components/ProjectStatusControl";
 import ReminderForm from "@/components/ReminderForm";
 import ReminderScheduleForm from "@/components/ReminderScheduleForm";
 import ReminderStatusStrip from "@/components/ReminderStatusStrip";
-import { getCurrentUser, getProjectDetail } from "@/lib/api";
+import { getProjectDetail } from "@/lib/api";
+import { requireAbility } from "@/lib/auth";
+import { can, canEditProject } from "@/lib/permissions";
 import { formatMarginPct, projectMargin } from "@/lib/finance";
 import { SCORE_MAX } from "@/lib/priority";
 import { isActiveStatus } from "@/lib/types";
@@ -35,6 +37,8 @@ export async function generateMetadata({ params }: PageProps<"/proyek/[id]">) {
 }
 
 export default async function DetailProyekPage({ params }: PageProps<"/proyek/[id]">) {
+  const pengguna = await requireAbility("lihat-detail");
+
   const { id } = await params;
   // Id non-angka ("abc") ikut jatuh ke notFound lewat NaN.
   const detail = await getProjectDetail(Number(id));
@@ -54,7 +58,13 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
     dependencyCandidates,
   } =
     detail;
-  const pengguna = await getCurrentUser();
+  /* Hak dihitung sekali di server. Menyembunyikan tombol bukan kontrol
+     keamanan — server action punya penjaganya sendiri — tapi menampilkan
+     tombol yang pasti ditolak itu menyesatkan. */
+  const bolehUbah = canEditProject(pengguna, project);
+  const bolehKeuangan = can(pengguna.accessLevel, "lihat-keuangan");
+  const bolehKolaborasi = can(pengguna.accessLevel, "kolaborasi");
+
   // Tanggal acuan ditentukan server supaya validasi klien tidak beda gara-gara zona waktu.
   const hariIni = new Date().toISOString().slice(0, 10);
   const aktif = isActiveStatus(project.status);
@@ -138,15 +148,17 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             </div>
           </dl>
 
-          <div className="mt-5 border-t border-border pt-4">
-            <h3 className="text-sm font-medium">Catat progres</h3>
-            <p className="mt-0.5 text-xs text-muted">
-              Setiap pembaruan tersimpan di riwayat sebagai jejak audit.
-            </p>
-            <div className="mt-3">
-              <ProgressForm projectId={project.id} current={project.progressPct} />
+          {bolehUbah && (
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="text-sm font-medium">Catat progres</h3>
+              <p className="mt-0.5 text-xs text-muted">
+                Setiap pembaruan tersimpan di riwayat sebagai jejak audit.
+              </p>
+              <div className="mt-3">
+                <ProgressForm projectId={project.id} current={project.progressPct} />
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
         <section
@@ -250,7 +262,13 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             progres.
           </p>
           <div className="mt-3">
-            <ProjectStatusControl projectId={project.id} status={project.status} />
+            {bolehUbah ? (
+              <ProjectStatusControl projectId={project.id} status={project.status} />
+            ) : (
+              <p className="text-sm text-muted">
+                Status hanya bisa diubah PIC proyek ini atau Manager.
+              </p>
+            )}
           </div>
         </section>
 
@@ -267,12 +285,20 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             10%. Dua proyek tidak boleh saling menahan.
           </p>
           <div className="mt-3">
-            <DependencyPicker
-              projectId={project.id}
-              candidates={dependencyCandidates}
-              blocking={dependencies.blocking}
-              blockedBy={dependencies.blockedBy}
-            />
+            {bolehUbah ? (
+              <DependencyPicker
+                projectId={project.id}
+                candidates={dependencyCandidates}
+                blocking={dependencies.blocking}
+                blockedBy={dependencies.blockedBy}
+              />
+            ) : (
+              <p className="text-sm text-muted">
+                {dependencies.blocking.length === 0
+                  ? "Proyek ini tidak menahan proyek lain."
+                  : `Menahan: ${dependencies.blocking.map((p) => p.name).join(", ")}.`}
+              </p>
+            )}
           </div>
         </section>
 
@@ -354,6 +380,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
           </dl>
         </section>
 
+        {bolehKeuangan && (
         <section
           aria-labelledby="kontrak-heading"
           className="rounded-xl border border-border bg-surface p-5 shadow-card lg:col-span-3"
@@ -467,6 +494,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             )}
           </div>
         </section>
+        )}
       </div>
 
       <section aria-labelledby="pengingat-heading" className="mt-6">
@@ -482,10 +510,13 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
         </div>
 
         <div className="mt-3 grid gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card lg:col-span-2">
-            <ReminderForm projectId={project.id} ownerName={owner?.name ?? "PIC proyek"} />
-          </div>
+          {bolehKolaborasi && (
+            <div className="rounded-xl border border-border bg-surface p-5 shadow-card lg:col-span-2">
+              <ReminderForm projectId={project.id} ownerName={owner?.name ?? "PIC proyek"} />
+            </div>
+          )}
 
+          {bolehUbah && (
           <div className="rounded-xl border border-border bg-surface p-5 shadow-card lg:col-span-2">
             <h3 className="text-sm font-medium">Jadwal Berulang</h3>
             <p className="mt-0.5 mb-3 text-xs text-muted">
@@ -497,6 +528,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
               today={hariIni}
             />
           </div>
+          )}
 
           <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
             <h3 className="text-sm font-medium">Sudah Dikirim</h3>
@@ -548,6 +580,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             projectId={project.id}
             comments={comments}
             currentUserId={pengguna.id}
+            bolehTulis={bolehKolaborasi}
           />
         </div>
       </section>

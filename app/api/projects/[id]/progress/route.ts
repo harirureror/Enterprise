@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { addProgress, getCurrentUser, getProgressHistory, getProject } from "@/lib/api";
+import { jagaRute } from "@/lib/api-guard";
+import { addProgress, getProgressHistory, getProject } from "@/lib/api";
 import { type ProgressDraft, validateProgress } from "@/lib/progress-form";
 
 /**
@@ -25,6 +26,9 @@ const idTidakValid = NextResponse.json(
 const tidakDitemukan = NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("lihat-detail");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
@@ -39,6 +43,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const izin = await jagaRute("ubah-semua-proyek");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
@@ -74,7 +81,9 @@ export async function PATCH(
 
   // ponytail: pencatat diambil dari sesi setelah fase autentikasi; sekarang
   // masih pengguna aktif bawaan.
-  const user = await getCurrentUser();
+  // Pencatatnya pengguna sesi. getCurrentUser() mengembalikan pengguna
+  // pertama, jadi seluruh catatan akan diatasnamakan orang yang sama.
+  const user = izin.user;
   const entry = await addProgress({
     projectId: id,
     userId: user.id,

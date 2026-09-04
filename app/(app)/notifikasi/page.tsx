@@ -2,6 +2,7 @@ import NotificationList from "@/components/NotificationList";
 import StatCard from "@/components/StatCard";
 import { getNotifications, getReminderStatusMap, getUsers } from "@/lib/api";
 import { KIND_LABELS, SOON_DAYS, STALE_DAYS } from "@/lib/notifications";
+import { requireAbility } from "@/lib/auth";
 
 // Notifikasi dihitung dari keadaan terkini, jadi halamannya tidak boleh dicache.
 export const dynamic = "force-dynamic";
@@ -12,6 +13,8 @@ export const metadata = {
 };
 
 export default async function NotifikasiPage() {
+  await requireAbility("lihat-notifikasi");
+
   const [feed, users, statusPengingat] = await Promise.all([
     getNotifications(),
     getUsers(),

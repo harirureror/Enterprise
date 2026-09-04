@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { runDueReminders } from "@/lib/api";
 
 /**
@@ -36,6 +37,9 @@ function periksaOtorisasi(request: NextRequest): NextResponse | null {
 }
 
 export async function POST(request: NextRequest) {
+  const izin = await jagaRute("ubah-semua-proyek");
+  if (!izin.ok) return izin.response;
+
   const ditolak = periksaOtorisasi(request);
   if (ditolak) return ditolak;
 

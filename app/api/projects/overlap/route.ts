@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getOverlapStats } from "@/lib/api";
 import { parseProjectFilter } from "@/lib/filters";
 
@@ -8,6 +9,9 @@ import { parseProjectFilter } from "@/lib/filters";
  * tanpa daftar proyeknya (pakai /api/projects/timeline kalau butuh datanya).
  */
 export async function GET(request: NextRequest) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const { filter, invalid } = parseProjectFilter(request.nextUrl.searchParams);
 
   if (invalid.length > 0) {

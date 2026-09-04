@@ -1,4 +1,5 @@
 import type {
+  AgendaEntry,
   Credential,
   ProjectDependency,
   ProgressEntry,
@@ -14,30 +15,38 @@ export const users: User[] = [
   {
     id: 1,
     name: "Harir",
-    email: "harir@jayasurvei.co.id",
+    email: "harir@jayasurvey.id",
     avatarUrl: null,
-    role: "Project Manager"
+    role: "Project Manager",
+    accessLevel: "Admin",
+    isActive: true
   },
   {
     id: 2,
     name: "Rika",
-    email: "rika@jayasurvei.co.id",
+    email: "rika@jayasurvey.id",
     avatarUrl: null,
-    role: "Project Manager"
+    role: "Project Manager",
+    accessLevel: "Manager",
+    isActive: true
   },
   {
     id: 3,
     name: "Nurdiyansah",
-    email: "nurdiyansah@jayasurvei.co.id",
+    email: "nurdiyansah@jayasurvey.id",
     avatarUrl: null,
-    role: "Project Manager"
+    role: "Project Manager",
+    accessLevel: "Anggota",
+    isActive: true
   },
   {
     id: 6,
     name: "Admin Uji",
-    email: "admin@jayasurvei.co.id",
+    email: "admin@jayasurvey.id",
     avatarUrl: null,
-    role: "Administrator"
+    role: "Administrator",
+    accessLevel: "Admin",
+    isActive: true
   }
 ];
 
@@ -565,6 +574,95 @@ export const projects: Project[] = [
 
 export const progressHistory: ProgressEntry[] = [];
 
+/**
+ * Agenda tim contoh, pekan 31 Agustus - 6 September 2026.
+ *
+ * Sengaja melatih keempat jenis kegiatan sekaligus satu agenda yang melintasi
+ * pekan, supaya tampilan mingguan dan laporan benar-benar teruji.
+ */
+export const agenda: AgendaEntry[] = [
+  {
+    id: 1,
+    userId: 1,
+    projectId: 1,
+    kind: "Lapangan",
+    startDate: "2026-08-31",
+    endDate: "2026-09-02",
+    locationCity: "Semarang",
+    locationProvince: "Jawa Tengah",
+    note: "Pengambilan data SLAM LiDAR petak utara.",
+    createdBy: 1,
+    updatedAt: "2026-08-28",
+  },
+  {
+    id: 2,
+    userId: 1,
+    projectId: null,
+    kind: "Kantor",
+    startDate: "2026-09-03",
+    endDate: "2026-09-04",
+    locationCity: "Bandung",
+    locationProvince: "Jawa Barat",
+    note: "Pengolahan data dan rapat divisi.",
+    createdBy: 1,
+    updatedAt: "2026-08-28",
+  },
+  {
+    id: 3,
+    userId: 2,
+    projectId: 3,
+    kind: "Perjalanan",
+    startDate: "2026-09-01",
+    endDate: "2026-09-01",
+    locationCity: "Prabumulih",
+    locationProvince: "Sumatera Selatan",
+    note: "Berangkat ke lokasi, transit Palembang.",
+    createdBy: 2,
+    updatedAt: "2026-08-29",
+  },
+  {
+    id: 4,
+    userId: 2,
+    projectId: 3,
+    kind: "Lapangan",
+    startDate: "2026-09-02",
+    endDate: "2026-09-05",
+    locationCity: "Prabumulih",
+    locationProvince: "Sumatera Selatan",
+    note: "Pengukuran batas lahan.",
+    createdBy: 2,
+    updatedAt: "2026-08-29",
+  },
+  {
+    // Diisikan Manager untuk anggotanya — createdBy sengaja berbeda dari userId.
+    id: 5,
+    userId: 3,
+    projectId: 5,
+    kind: "Lapangan",
+    startDate: "2026-09-01",
+    endDate: "2026-09-04",
+    locationCity: "Muara Enim",
+    locationProvince: "Sumatera Selatan",
+    note: "Akuisisi LiDAR blok selatan.",
+    createdBy: 2,
+    updatedAt: "2026-08-30",
+  },
+  {
+    // Melintasi pergantian pekan: mulai Minggu, berakhir pekan berikutnya.
+    id: 6,
+    userId: 3,
+    projectId: null,
+    kind: "Cuti",
+    startDate: "2026-09-06",
+    endDate: "2026-09-09",
+    locationCity: "",
+    locationProvince: "",
+    note: "Cuti tahunan.",
+    createdBy: 3,
+    updatedAt: "2026-08-30",
+  },
+];
+
 export function getUser(id: number): User | undefined {
   return users.find((u) => u.id === id);
 }
@@ -575,12 +673,38 @@ export const reminderSchedules: ReminderSchedule[] = [];
 
 export const comments: ProjectComment[] = [];
 
+/**
+ * Kredensial masuk keempat akun.
+ *
+ * `devOnly: false` — hash ini dibangkitkan khusus untuk instalasi ini, bukan
+ * contoh yang beredar di repositori publik, jadi berlaku juga di produksi.
+ * Sandi awalnya diserahkan ke admin di luar repo; gantilah lewat halaman
+ * Kelola Pengguna, dan hash di bawah akan ikut berubah.
+ */
 export const credentials: Credential[] = [
+  {
+    userId: 1,
+    passwordHash:
+      "scrypt$16384$8$1$dc90ad913c9a6411307e76a3412b67f2$7f0c782fe0b93ff9a8d516dbfff92e68db286804d73a440c89c99ef27b5b0ba9d77c0b67fd5adbbac55f44d1fcf87ae28c40e51e2e1d581ded92a8bd2630569e",
+    devOnly: false,
+  },
+  {
+    userId: 2,
+    passwordHash:
+      "scrypt$16384$8$1$44dfbf5896961e5cf19e78a69601b494$90c140c037b05c237dd9c8f3c920402b6d9350554893cef8cb5c176da175d63dd8dd6a760550e1b98709c54696dda2f27ee6b39b9a2348436b80938d3207a4a4",
+    devOnly: false,
+  },
+  {
+    userId: 3,
+    passwordHash:
+      "scrypt$16384$8$1$e3caa6304378f1944c7c34859b333920$da79f28fff16ead04e5040aa05ff39407011a9a7d0ff4dbae6b4668cb3c5aa6ba94485634764c546cd9ce13df89da3bed185309ae5086936490ddf281824d523",
+    devOnly: false,
+  },
   {
     userId: 6,
     passwordHash:
-      "scrypt$16384$8$1$dad6019acaeff8be525e59be5056931f$66cf33bf9ffaba38ca1da809b94033bd947b988d81472e1c4eb4d5cb62bdf852b5c93b78a5e5b7ccdabc41e9177a95bf3b1ca0d67a7b39cbc21b2e54d00d448d",
-    devOnly: true,
+      "scrypt$16384$8$1$300444755f305fcee0ecf3d6b357ed04$e87ccfc032882ba24eafca01fe613c5a0cb8690b194d5fb54b596df5543772e74ceac10fdbed506b83625efa49b868b8f6707d3965c2234a91fae9908d51b88a",
+    devOnly: false,
   },
 ];
 

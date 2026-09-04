@@ -1,12 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getMemberProfile } from "@/lib/api";
-import { requireSession } from "@/lib/auth";
-import { unauthorized } from "@/lib/auth-response";
+import { jagaRute } from "@/lib/api-guard";
 
 /** GET /api/users/{id} — profil satu anggota berikut proyek dan kontribusinya. */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const sesi = await requireSession();
-  if (!sesi) return unauthorized();
+  const izin = await jagaRute("lihat-tim");
+  if (!izin.ok) return izin.response;
 
   const { id } = await params;
   const angka = Number(id);

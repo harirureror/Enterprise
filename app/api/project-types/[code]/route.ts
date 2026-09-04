@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getProjectType, updateProjectType } from "@/lib/api";
 import { type TypeDraft, validateTypeDraft } from "@/lib/type-form";
 
@@ -13,12 +14,18 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const { code } = await params;
   const jenis = await getProjectType(decodeURIComponent(code));
   return jenis ? NextResponse.json({ type: jenis }) : tidakDitemukan;
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  const izin = await jagaRute("kelola-jenis");
+  if (!izin.ok) return izin.response;
+
   const { code } = await params;
   const kode = decodeURIComponent(code);
 
@@ -71,6 +78,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE() {
+  const izin = await jagaRute("kelola-jenis");
+  if (!izin.ok) return izin.response;
+
   return NextResponse.json(
     {
       error:

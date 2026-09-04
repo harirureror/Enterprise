@@ -6,6 +6,7 @@
  */
 import type { DatabaseSync } from "node:sqlite";
 import {
+  agenda,
   comments,
   credentials,
   projectDependencies,
@@ -34,7 +35,26 @@ export function seed(db: DatabaseSync): {
   schedules: number;
   comments: number;
   dependencies: number;
+  agenda: number;
 } {
+  const insertAgenda = db.prepare(`
+    INSERT INTO agenda
+      (id, user_id, project_id, kind, start_date, end_date,
+       location_city, location_province, note, created_by, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      user_id = excluded.user_id,
+      project_id = excluded.project_id,
+      kind = excluded.kind,
+      start_date = excluded.start_date,
+      end_date = excluded.end_date,
+      location_city = excluded.location_city,
+      location_province = excluded.location_province,
+      note = excluded.note,
+      created_by = excluded.created_by,
+      updated_at = excluded.updated_at
+  `);
+
   const insertDependency = db.prepare(`
     INSERT INTO project_dependencies (blocker_id, blocked_id)
     VALUES (?, ?)
@@ -99,13 +119,15 @@ export function seed(db: DatabaseSync): {
   `);
 
   const insertUser = db.prepare(`
-    INSERT INTO users (id, email, name, avatar_url, role, password_hash)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (id, email, name, avatar_url, role, access_level, is_active, password_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       email = excluded.email,
       name = excluded.name,
       avatar_url = excluded.avatar_url,
       role = excluded.role,
+      access_level = excluded.access_level,
+      is_active = excluded.is_active,
       password_hash = excluded.password_hash,
       updated_at = datetime('now')
   `);
@@ -158,7 +180,16 @@ export function seed(db: DatabaseSync): {
     for (const u of users) {
       // Hanya akun yang punya kredensial yang dapat hash; sisanya null.
       const kredensial = credentials.find((c) => c.userId === u.id);
-      insertUser.run(u.id, u.email, u.name, u.avatarUrl, u.role, kredensial?.passwordHash ?? null);
+      insertUser.run(
+        u.id,
+        u.email,
+        u.name,
+        u.avatarUrl,
+        u.role,
+        u.accessLevel,
+        u.isActive ? 1 : 0,
+        kredensial?.passwordHash ?? null
+      );
     }
     for (const p of projects) {
       insertProject.run(
@@ -231,6 +262,22 @@ export function seed(db: DatabaseSync): {
     for (const c of comments) {
       insertComment.run(c.id, c.projectId, c.userId, c.body, c.createdAt, c.postedAt);
     }
+    // Agenda menunjuk users dan projects sekaligus, jadi setelah keduanya ada.
+    for (const a of agenda) {
+      insertAgenda.run(
+        a.id,
+        a.userId,
+        a.projectId,
+        a.kind,
+        a.startDate,
+        a.endDate,
+        a.locationCity,
+        a.locationProvince,
+        a.note,
+        a.createdBy,
+        a.updatedAt
+      );
+    }
     // Ketergantungan paling akhir: kedua sisinya menunjuk projects.
     for (const d of projectDependencies) {
       insertDependency.run(d.blockerId, d.blockedId);
@@ -250,5 +297,6 @@ export function seed(db: DatabaseSync): {
     schedules: reminderSchedules.length,
     comments: comments.length,
     dependencies: projectDependencies.length,
+    agenda: agenda.length,
   };
 }

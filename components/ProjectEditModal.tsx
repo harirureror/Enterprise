@@ -21,10 +21,13 @@ export default function ProjectEditModal({
   project,
   options,
   onClose,
+  bolehKeuangan = true,
 }: {
   project: Project;
   options: FilterOptions;
   onClose: () => void;
+  /** Diteruskan ke ProjectFields; lihat catatannya di sana. */
+  bolehKeuangan?: boolean;
 }) {
   const router = useRouter();
   const uid = useId();
@@ -121,6 +124,7 @@ export default function ProjectEditModal({
           )}
 
           <ProjectFields
+            bolehKeuangan={bolehKeuangan}
             prefix={uid}
             draft={draft}
             errors={errors}

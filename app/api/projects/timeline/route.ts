@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute, saringDaftar } from "@/lib/api-guard";
 import { getTimeline } from "@/lib/api";
 import { parseProjectFilter } from "@/lib/filters";
 
@@ -8,6 +9,9 @@ import { parseProjectFilter } from "@/lib/filters";
  * mengikuti hasil saringan.
  */
 export async function GET(request: NextRequest) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const { filter, invalid } = parseProjectFilter(request.nextUrl.searchParams);
 
   if (invalid.length > 0) {
@@ -17,5 +21,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ...(await getTimeline(filter)), filter });
+  const timeline = await getTimeline(filter);
+  return NextResponse.json({
+    ...timeline,
+    projects: saringDaftar(timeline.projects, izin.bolehKeuangan),
+    filter,
+  });
 }

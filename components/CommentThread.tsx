@@ -24,10 +24,13 @@ export default function CommentThread({
   projectId,
   comments,
   currentUserId,
+  bolehTulis = true,
 }: {
   projectId: number;
   comments: CommentView[];
   currentUserId: number;
+  /** Boleh menambah komentar? Membacanya tidak pernah dibatasi di sini. */
+  bolehTulis?: boolean;
 }) {
   const router = useRouter();
   const uid = useId();
@@ -105,6 +108,13 @@ export default function CommentThread({
         </ul>
       )}
 
+      {!bolehTulis && (
+        <p className="mt-5 border-t border-border pt-4 text-sm text-muted">
+          Akses Anda tidak mencakup penulisan komentar.
+        </p>
+      )}
+
+      {bolehTulis && (
       <form noValidate onSubmit={handleSubmit} className="mt-5 border-t border-border pt-4">
         {gagal && (
           <p
@@ -149,6 +159,7 @@ export default function CommentThread({
           {saving ? "Mengirim…" : "Kirim Komentar"}
         </button>
       </form>
+      )}
     </div>
   );
 }

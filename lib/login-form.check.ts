@@ -12,13 +12,13 @@ import {
 const cek = (email: string, password: string) => validateLogin({ email, password });
 
 // Isian wajar lolos.
-assert.deepEqual(cek("rani@jayasurvei.co.id", "rahasia123"), {});
+assert.deepEqual(cek("rani@jayasurvey.id", "rahasia123"), {});
 
-// Email: wajib dan harus berbentuk email.
-assert.equal(cek("", "rahasia123").email, "Email wajib diisi.");
-assert.equal(cek("   ", "rahasia123").email, "Email wajib diisi.");
-assert.ok(cek("bukan-email", "rahasia123").email);
-assert.ok(cek("a@b", "rahasia123").email);
+// Email atau nama: wajib diisi, format bebas.
+assert.equal(cek("", "rahasia123").email, "Email atau nama pengguna wajib diisi.");
+assert.equal(cek("   ", "rahasia123").email, "Email atau nama pengguna wajib diisi.");
+assert.deepEqual(cek("bukan-email", "rahasia123"), {});
+assert.deepEqual(cek("a@b", "rahasia123"), {});
 assert.deepEqual(cek("  a@b.co  ", "rahasia123"), {});
 
 // Kata sandi: hanya wajib terisi. Form masuk sengaja tidak menuntut panjang
@@ -41,7 +41,7 @@ assert.ok(Object.keys(validateLogin(emptyLoginDraft())).length > 0);
 
 // Pesan kredensial salah harus seragam dan tidak menyebut kolom tertentu —
 // kalau menyebut, penyerang bisa menebak email mana yang terdaftar.
-assert.equal(PESAN_KREDENSIAL_SALAH, "Email atau kata sandi salah.");
+assert.equal(PESAN_KREDENSIAL_SALAH, "Identitas atau kata sandi salah.");
 assert.equal(/tidak terdaftar|tidak ditemukan/i.test(PESAN_KREDENSIAL_SALAH), false);
 
 console.log("ok: login-form");

@@ -1,5 +1,6 @@
 import TimelineChart from "@/components/TimelineChart";
 import { getTimeline } from "@/lib/api";
+import { requireAbility } from "@/lib/auth";
 
 export const metadata = {
   title: "Timeline Proyek — Divisi Enterprise JSI",
@@ -7,6 +8,8 @@ export const metadata = {
 };
 
 export default async function TimelinePage() {
+  await requireAbility("lihat-daftar");
+
   // Sumber data sama dengan GET /api/projects/timeline, tanpa lompat HTTP dari server.
   const { projects, overlapPairs } = await getTimeline();
 

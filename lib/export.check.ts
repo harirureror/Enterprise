@@ -26,7 +26,10 @@ import {
   timelineSummary,
 } from "./export/timeline-dataset";
 import { datasetToWord } from "./export/word";
-import { projects as mockProjects, users as mockUsers } from "./mock-data";
+import { agenda as mockAgenda, projects as mockProjects, users as mockUsers } from "./mock-data";
+import { berkasMingguan } from "./export/weekly";
+import { FINANCE_FIELDS } from "./permissions";
+import type { AgendaEntry, Project, User } from "./types";
 
 const HARI_INI = "2026-08-30";
 
@@ -313,6 +316,131 @@ async function main() {
   for (const k of ownerConflictLines(mockProjects, users)) {
     assert.ok(k.owner.length > 0 && k.projects.includes(","));
   }
+
+  /* --- Laporan mingguan ---------------------------------------------------- */
+
+  const ACUAN = "2026-09-04"; // Jumat; pekannya 31 Agustus - 6 September.
+
+  const mingguan = (bolehKeuangan: boolean, format: "excel" | "word" | "pdf") =>
+    berkasMingguan({
+      projects: mockProjects,
+      users: mockUsers,
+      agenda: mockAgenda,
+      format,
+      tanggal: ACUAN,
+      bolehKeuangan,
+    });
+
+  /* Excel: satu lembar per bagian, dan bagian agenda benar-benar ada. */
+  const mingguExcel = await mingguan(true, "excel");
+  const isiMinggu = isiZip(mingguExcel);
+  assert.ok(isiMinggu["xl/worksheets/sheet1.xml"], "lembar pertama tidak ada");
+  assert.ok(isiMinggu["xl/worksheets/sheet4.xml"], "bagian agenda tidak dapat lembarnya");
+
+  const bukuMinggu = teksDari(isiMinggu, /workbook\.xml$/);
+  for (const bagian of ["Lewat Tenggat", "Tenggat 7 Hari", "Agenda Pekan Ini", "Bentrok PIC"]) {
+    assert.ok(bukuMinggu.includes(bagian), `bagian "${bagian}" tidak ada di laporan mingguan`);
+  }
+
+  // Agenda pekan itu benar-benar tertulis, lengkap dengan orang dan lokasinya.
+  const kamusMinggu = teksDari(isiMinggu, /sharedStrings\.xml$/);
+  const agendaPekanItu = mockAgenda.filter(
+    (a) => a.startDate <= "2026-09-06" && a.endDate >= "2026-08-31"
+  );
+  assert.ok(agendaPekanItu.length > 0, "mock-data perlu agenda di pekan acuan");
+  for (const a of agendaPekanItu) {
+    const orang = mockUsers.find((u) => u.id === a.userId)!;
+    assert.ok(kamusMinggu.includes(orang.name), `${orang.name} tidak muncul di laporan`);
+  }
+  // Agenda di luar pekan itu tidak ikut terbawa.
+  const diLuarPekan = mockAgenda.filter((a) => a.startDate > "2026-09-06" || a.endDate < "2026-08-31");
+  for (const a of diLuarPekan) {
+    if (a.note !== "") {
+      assert.equal(
+        kamusMinggu.includes(a.note),
+        false,
+        `agenda di luar pekan ikut terbawa: ${a.note}`
+      );
+    }
+  }
+
+  /* Word dan PDF juga terbentuk utuh. */
+  const mingguWord = isiZip(await mingguan(true, "word"));
+  const dokumenMinggu = teksDari(mingguWord, /word\/document\.xml$/);
+  assert.ok(dokumenMinggu.includes("Agenda Pekan Ini"), "bagian agenda tidak ada di docx");
+  assert.ok(dokumenMinggu.includes("Laporan Mingguan"));
+
+  const mingguPdf = await mingguan(true, "pdf");
+  assert.equal(mingguPdf.subarray(0, 4).toString(), "%PDF");
+  assert.ok((await PDFDocument.load(new Uint8Array(mingguPdf))).getPageCount() >= 1);
+
+  /* --- Penyensoran keuangan ------------------------------------------------ */
+
+  /* Yang paling penting: kolom keuangan tidak boleh ADA di berkasnya, bukan
+     sekadar dikosongkan. Dicari langsung di XML-nya. */
+  const JUDUL_UANG = ["Nilai Kontrak", "Margin", "Sales Fee", "Cost Operasional", "Pendapatan (DPP)"];
+
+  const tanpaUang = isiZip(await mingguan(false, "excel"));
+  const kamusTanpaUang = teksDari(tanpaUang, /sharedStrings\.xml$/);
+  for (const judul of JUDUL_UANG) {
+    assert.equal(
+      kamusTanpaUang.includes(judul),
+      false,
+      `kolom "${judul}" bocor ke laporan tanpa hak keuangan`
+    );
+  }
+  // Tapi isinya tetap berguna: bagian agenda dan proyeknya tetap ada.
+  assert.ok(teksDari(tanpaUang, /workbook\.xml$/).includes("Agenda Pekan Ini"));
+  assert.ok(kamusTanpaUang.includes("Nama Proyek"));
+
+  // Nilai kontraknya sendiri juga tidak ikut sebagai angka mentah.
+  const lembarTanpaUang = teksDari(tanpaUang, /worksheets\/sheet1\.xml$/);
+  const berharga2 = mockProjects.find((p) => p.value !== null);
+  if (berharga2) {
+    assert.equal(
+      lembarTanpaUang.includes(`>${berharga2.value}<`),
+      false,
+      "nilai kontrak bocor sebagai angka"
+    );
+  }
+
+  // Word dan PDF pun sama.
+  const wordTanpaUang = teksDari(isiZip(await mingguan(false, "word")), /word\/document\.xml$/);
+  for (const judul of JUDUL_UANG) {
+    assert.equal(wordTanpaUang.includes(judul), false, `"${judul}" bocor ke docx`);
+  }
+
+  // Daftar kunci keuangan tidak boleh kosong — kalau kosong, seluruh
+  // penyensoran di atas jadi tidak menguji apa pun.
+  assert.ok(FINANCE_FIELDS.length >= 4);
+
+  /* Daftar kosong tetap menghasilkan berkas yang bisa dibuka. */
+  const kosongArgs = {
+    projects: [] as Project[],
+    users: [] as User[],
+    agenda: [] as AgendaEntry[],
+    tanggal: ACUAN,
+    bolehKeuangan: true,
+  };
+
+  // Excel: lembarnya tetap terbentuk dengan kepala kolom. Sengaja tidak
+  // menuliskan "tidak ada apa-apa" — lembar kosong berkepala justru yang
+  // diharapkan orang saat menyaring spreadsheet.
+  const kosongExcel = isiZip(await berkasMingguan({ ...kosongArgs, format: "excel" }));
+  assert.ok(kosongExcel["xl/worksheets/sheet1.xml"]);
+  assert.ok(teksDari(kosongExcel, /workbook\.xml$/).includes("Agenda Pekan Ini"));
+
+  // Word dan PDF dibaca orang, jadi di sana kekosongannya dikatakan.
+  const kosongWord = teksDari(
+    isiZip(await berkasMingguan({ ...kosongArgs, format: "word" })),
+    /word\/document\.xml$/
+  );
+  assert.ok(kosongWord.includes("Belum ada agenda tercatat"));
+  assert.ok(
+    (await PDFDocument.load(
+      new Uint8Array(await berkasMingguan({ ...kosongArgs, format: "pdf" }))
+    )).getPageCount() >= 1
+  );
 
   console.log("ok: export");
 }

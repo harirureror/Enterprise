@@ -18,6 +18,6 @@ console.log(
 console.log(
   `Seed: ${jumlah.users} anggota, ${jumlah.projects} proyek, ${jumlah.types} jenis, ` +
     `${jumlah.progress} riwayat, ${jumlah.reminders} pengingat, ${jumlah.schedules} jadwal, ` +
-    `${jumlah.comments} komentar, ${jumlah.dependencies} ketergantungan`
+    `${jumlah.comments} komentar, ${jumlah.dependencies} ketergantungan, ${jumlah.agenda} agenda`
 );
 console.log(`Database: ${DB_PATH}`);

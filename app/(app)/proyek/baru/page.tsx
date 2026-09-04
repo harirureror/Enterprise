@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ProjectForm from "@/components/ProjectForm";
 import { getFilterOptions } from "@/lib/api";
+import { requireAbility } from "@/lib/auth";
 
 export const metadata = {
   title: "Tambah Proyek — Divisi Enterprise JSI",
@@ -8,6 +9,8 @@ export const metadata = {
 };
 
 export default async function ProyekBaruPage() {
+  await requireAbility("buat-proyek");
+
   const options = await getFilterOptions();
 
   return (

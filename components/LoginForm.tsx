@@ -79,17 +79,17 @@ export default function LoginForm() {
       )}
 
       <label className="block text-sm" htmlFor={`${uid}-email`}>
-        <span className="font-medium">Email</span>
+        <span className="font-medium">Email atau Nama</span>
       </label>
       <input
         id={`${uid}-email`}
-        type="email"
+        type="text"
         autoComplete="username"
         value={draft.email}
         aria-invalid={errors.email ? true : undefined}
         aria-describedby={errors.email ? `${uid}-email-error` : undefined}
         onChange={(e) => ubah("email", e.target.value)}
-        placeholder="nama@jayasurvei.co.id"
+        placeholder="Email atau nama"
         className={inputClass(errors.email)}
       />
       {errors.email && (

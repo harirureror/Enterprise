@@ -3,6 +3,7 @@ import Badge from "@/components/Badge";
 import { getTypeBreakdown } from "@/lib/api";
 import { formatDate, statusClass } from "@/lib/ui";
 import { PROJECT_STATUSES } from "@/lib/types";
+import { requireAbility } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export const metadata = {
 };
 
 export default async function JenisProyekPage() {
+  await requireAbility("kelola-jenis");
+
   const jenis = await getTypeBreakdown();
   const total = jenis.reduce((sum, j) => sum + j.total, 0);
 

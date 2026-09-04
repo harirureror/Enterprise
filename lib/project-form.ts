@@ -129,7 +129,7 @@ export function projectToDraft(project: Project): ProjectDraft {
 }
 
 /** Tanggal benar-benar ada di kalender — "2026-02-31" lolos regex tapi tidak nyata. */
-function tanggalNyata(iso: string): boolean {
+export function tanggalNyata(iso: string): boolean {
   if (!ISO_DATE.test(iso)) return false;
   const d = new Date(`${iso}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;

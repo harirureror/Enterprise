@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import SidebarNav from "@/components/SidebarNav";
 import type { Notification } from "@/lib/notifications";
+import type { AccessLevel } from "@/lib/types";
 import { readStateSnapshot, unreadCount } from "@/lib/notification-reads";
 import { useSyncExternalStore } from "react";
 import { serverReadState, subscribeReadState } from "@/lib/notification-reads";
@@ -17,7 +18,13 @@ import { serverReadState, subscribeReadState } from "@/lib/notification-reads";
    tanpa library. Bedanya dengan modal biasa: `m-0 mr-auto` menempelkannya ke
    tepi kiri setinggi layar, bukan memusatkannya. */
 
-export default function MobileNav({ notifications }: { notifications: Notification[] }) {
+export default function MobileNav({
+  notifications,
+  accessLevel,
+}: {
+  notifications: Notification[];
+  accessLevel: AccessLevel;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [terbuka, setTerbuka] = useState(false);
 
@@ -86,7 +93,11 @@ export default function MobileNav({ notifications }: { notifications: Notificati
           <div className="flex-1 overflow-y-auto px-2 py-3">
             {/* Menutup laci setelah pindah halaman; kalau tidak, laci menutupi
                 halaman yang baru saja dibuka. */}
-            <SidebarNav notifications={notifications} onNavigate={() => setTerbuka(false)} />
+            <SidebarNav
+              notifications={notifications}
+              accessLevel={accessLevel}
+              onNavigate={() => setTerbuka(false)}
+            />
           </div>
         </div>
       </dialog>

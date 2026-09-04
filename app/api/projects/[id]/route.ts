@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute, saringKeuangan } from "@/lib/api-guard";
 import { deleteProject, getProjectDetail, getUsers, updateProject } from "@/lib/api";
 import { type ProjectDraft, draftToProject, emptyDraft, validateDraft } from "@/lib/project-form";
 
@@ -23,6 +24,9 @@ const idTidakValid = NextResponse.json(
 const tidakDitemukan = NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
@@ -30,10 +34,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!detail) return tidakDitemukan;
 
   // Bentuknya sama dengan yang dipakai halaman detail, termasuk skor prioritas.
-  return NextResponse.json(detail);
+  return NextResponse.json({ ...detail, project: saringKeuangan(detail.project, izin.bolehKeuangan) });
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("ubah-semua-proyek");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
@@ -77,6 +84,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const izin = await jagaRute("hapus-proyek");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 

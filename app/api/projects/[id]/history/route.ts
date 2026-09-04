@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getProgressHistoryView, getProject } from "@/lib/api";
 
 /**
@@ -10,6 +11,9 @@ import { getProgressHistoryView, getProject } from "@/lib/api";
  * bentuk yang sama dengan yang dipakai halaman detail.
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("lihat-detail");
+  if (!izin.ok) return izin.response;
+
   const { id } = await params;
   const angka = Number(id);
 

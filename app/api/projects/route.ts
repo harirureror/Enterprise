@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute, saringDaftar } from "@/lib/api-guard";
 import { createProject, getProjects, getUsers } from "@/lib/api";
 import { parseProjectFilter } from "@/lib/filters";
 import { type ProjectDraft, draftToProject, emptyDraft, validateDraft } from "@/lib/project-form";
@@ -8,6 +9,9 @@ import { type ProjectDraft, draftToProject, emptyDraft, validateDraft } from "@/
  * Semua parameter opsional; kosong berarti tidak menyaring.
  */
 export async function GET(request: NextRequest) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const { filter, invalid } = parseProjectFilter(request.nextUrl.searchParams);
 
   if (invalid.length > 0) {
@@ -21,7 +25,14 @@ export async function GET(request: NextRequest) {
   // `total` dipakai UI untuk menulis "menampilkan X dari Y proyek".
   const total = (await getProjects()).length;
 
-  return NextResponse.json({ projects, count: projects.length, total, filter });
+  return NextResponse.json({
+    // Kolom keuangan dibuang di sini, bukan disembunyikan di klien: balasan API
+    // bisa dibaca langsung, jadi penyensorannya harus terjadi sebelum dikirim.
+    projects: saringDaftar(projects, izin.bolehKeuangan),
+    count: projects.length,
+    total,
+    filter,
+  });
 }
 
 /**
@@ -30,6 +41,9 @@ export async function GET(request: NextRequest) {
  * yang melewati form (atau langsung ke API) diperiksa dengan ukuran yang sama.
  */
 export async function POST(request: NextRequest) {
+  const izin = await jagaRute("buat-proyek");
+  if (!izin.ok) return izin.response;
+
   let body: unknown;
   try {
     body = await request.json();

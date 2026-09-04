@@ -41,6 +41,10 @@ Tujuan utamanya adalah meningkatkan transparansi, efisiensi koordinasi, dan mema
 | F15 | Halaman Profil Anggota | Menampilkan detail anggota tim dan daftar proyek yang sedang dikerjakan |
 | F16 | Timeline & Alokasi Jadwal | Pengguna dapat melihat visualisasi timeline/Gantt chart proyek yang berjalan dalam rentang waktu yang sama untuk memetakan jadwal overlap dan membagi fokus serta alokasi tim lapangan secara optimal |
 | F17 | Pengaturan Tema & Tampilan | Pengguna dapat memilih mode tampilan (Dark Mode / Light Mode) atau preferensi tema warna aksen antarmuka untuk kenyamanan visual, dan preferensi ini tersimpan di sistem/lokal |
+| F19 | Tingkat Akses & Peran | Lima tingkat akses (Admin, Owner, HR, Manager, Anggota) di kolom `access_level`, terpisah dari `role` yang berisi jabatan bebas. Navigasi, halaman, dan tombol menyesuaikan peran; penegakannya di server, bukan sekadar menyembunyikan tombol |
+| F20 | Kelola Pengguna | Admin dapat menambah akun beserta sandi awal, menyetel ulang sandi, mengubah tingkat akses, dan menonaktifkan akun. Menyetel sandi dan mengubah akses selalu mencabut sesi berjalan |
+| F21 | Agenda Tim | Manager dan Anggota mencatat agenda (Lapangan/Kantor/Perjalanan/Cuti) berikut tanggal, lokasi, dan proyek terkait. Manager dapat mengisikan untuk anggotanya. Seluruh peran dapat melihatnya — inilah cara HR tahu siapa sedang di mana |
+| F22 | Laporan Mingguan | Ekspor Excel/Word/PDF berisi ringkasan pekan: proyek telat, tenggat 7 hari, selesai pekan ini, agenda tim, dan bentrok PIC. Terbuka untuk semua peran; kolom keuangan menyesuaikan hak masing-masing |
 | F18 | Ekspor Data & Timeline | Daftar proyek dan timeline dapat diunduh sebagai Excel (.xlsx), Word (.docx), atau PDF. Ekspor mengikuti filter dan urutan yang sedang tampil di layar; nilainya tetap dibaca ulang di server sehingga berkas tidak pernah memuat angka yang sudah usang |
 
 ### Kebutuhan Non-Fungsional
@@ -189,6 +193,53 @@ diam-diam basi lebih berbahaya daripada ekspor yang gagal.
 
 Pustaka: `write-excel-file` (xlsx), `docx`, `pdf-lib`. Ketiganya murni JavaScript
 tanpa dependensi native.
+
+---
+
+## 3c. Matriks Tingkat Akses
+
+Tingkat akses disimpan di kolom `access_level`, **terpisah** dari `role` yang berisi
+jabatan bebas ("Project Manager"). Kalau keduanya satu kolom, mengganti jabatan
+seseorang akan diam-diam mengganti haknya juga.
+
+| Kemampuan | Admin | Owner | HR | Manager | Anggota |
+|---|---|---|---|---|---|
+| Daftar proyek + timeline | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Overview, detail proyek, tim, notifikasi | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Angka keuangan (margin, fee, cost, DPP) | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Komentar + kirim pengingat | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Ubah proyek apa pun | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Ubah proyek yang dipegang sendiri | ✅ | ❌ | ❌ | ✅ | ✅ |
+| Buat / hapus proyek, kelola jenis | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Kelola pengguna | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Ekspor + laporan mingguan | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Lihat agenda semua orang | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Isi agenda sendiri | ✅ | ❌ | ❌ | ✅ | ✅ |
+| Isi agenda orang lain | ✅ | ❌ | ❌ | ✅ | ❌ |
+
+Matriksnya ditulis sekali sebagai fungsi murni di `lib/permissions.ts` dan dikunci
+85 assertion di `lib/permissions.check.ts`.
+
+**Penegakan berlapis, dan yang sungguhan ada di server:**
+
+1. **Middleware** — hanya memeriksa bentuk cookie (Edge runtime, tidak bisa baca data).
+2. **Halaman** — `requireAbility()` mengalihkan ke halaman yang memang boleh dibuka
+   peran itu, bukan menampilkan halaman kosong. HR mendarat di `/proyek`.
+3. **Server action** — penjaga sesungguhnya. Menyembunyikan tombol bukan kontrol
+   keamanan; server action bisa dipanggil langsung.
+4. **Route handler** — sesi + kemampuan di 21 dari 23 endpoint (dua sisanya login
+   dan logout, yang memang publik).
+
+**Penyensoran keuangan membuang kolomnya, bukan menimpa nilainya dengan `null`.**
+Di sistem ini `null` sudah berarti "belum diisi", jadi menimpanya akan berbohong soal
+kelengkapan data. Kolomnya dibuang sebelum berkas ekspor dibentuk dan kuncinya dihapus
+dari balasan JSON.
+
+**Catatan penting soal sesi:** `POST /api/auth/login` dan server action `masuk()`
+menulis ke penyimpanan sesi yang berbeda — route handler dan halaman punya salinan
+modul sendiri-sendiri (lihat catatan di `lib/actions.ts`). Sesi yang dibuat lewat REST
+hanya berlaku untuk endpoint REST; sesi dari form login hanya berlaku untuk halaman
+dan server action. Aplikasi memakai jalur kedua.
 
 ---
 

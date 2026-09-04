@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { getCurrentUser, getUsers } from "./api";
+import { type Ability, can, landingPath } from "./permissions";
 import { credentials as mockCredentials } from "./mock-data";
 import { verifyPassword } from "./password";
 import { getSessionUserId } from "./session";
@@ -39,7 +41,10 @@ export async function getSession(): Promise<Session | null> {
     const id = getSessionUserId(nilai);
     if (id !== null) {
       const user = (await getUsers()).find((u) => u.id === id);
-      if (user) return { user, source: "cookie" };
+      // Akun yang dinonaktifkan tidak boleh lolos hanya karena tokennya belum
+      // kedaluwarsa. Sesinya memang dicabut saat dinonaktifkan, tapi pemeriksaan
+      // di sini yang membuatnya tidak bergantung pada langkah itu berhasil.
+      if (user && user.isActive) return { user, source: "cookie" };
     }
     // Token tidak dikenal atau kedaluwarsa: perlakukan seperti tidak ada.
   }
@@ -58,9 +63,16 @@ export async function getSession(): Promise<Session | null> {
   return null;
 }
 
-/** Sesi wajib dibuktikan, bukan diasumsikan. */
+/**
+ * Sesi wajib dibuktikan, bukan diasumsikan.
+ *
+ * Menyala secara bawaan sejak peran diberlakukan: selama jalan pintas
+ * `dev-fallback` hidup, siapa pun yang membuka aplikasi otomatis jadi pengguna
+ * pertama — dan pembedaan peran tidak menahan apa pun. Setel REQUIRE_AUTH=0
+ * hanya kalau sengaja mau mematikannya saat mengembangkan.
+ */
 export function authWajib(): boolean {
-  return process.env.REQUIRE_AUTH === "1";
+  return process.env.REQUIRE_AUTH !== "0";
 }
 
 /** Sesi yang wajib ada. `null` berarti pemanggil harus membalas 401. */
@@ -71,6 +83,38 @@ export async function requireSession(): Promise<Session | null> {
 /** Pengguna aktif saja, untuk pemanggil yang tidak peduli asal identitasnya. */
 export async function getSessionUser(): Promise<User | null> {
   return (await getSession())?.user ?? null;
+}
+
+/* --- Penjaga kemampuan -----------------------------------------------------
+
+   Dua bentuk untuk dua tempat: halaman mengalihkan, server action membalas.
+   Keduanya membaca matriks yang sama di lib/permissions.ts. */
+
+/**
+ * Penjaga halaman. Tanpa sesi diantar ke /login; punya sesi tapi bukan haknya
+ * diantar ke halaman yang memang boleh dia buka — bukan ke halaman kosong atau
+ * pesan galat yang tidak bisa ditindaklanjuti.
+ */
+export async function requireAbility(ability: Ability): Promise<User> {
+  const sesi = await getSession();
+  if (!sesi) redirect("/login");
+  if (!can(sesi.user.accessLevel, ability)) redirect(landingPath(sesi.user.accessLevel));
+  return sesi.user;
+}
+
+export type Ditolak = { ok: false; error: string; errors: Record<string, never> };
+
+/**
+ * Penjaga server action. `null` berarti lolos; selain itu hasil penolakan yang
+ * bentuknya sudah cocok dengan `SimpanHasil` dan kerabatnya di lib/actions.ts.
+ */
+export async function tolakKalauTakBoleh(ability: Ability): Promise<Ditolak | null> {
+  const pengguna = await getSessionUser();
+  if (!pengguna) return { ok: false, error: "Perlu masuk untuk melakukan ini.", errors: {} };
+  if (!can(pengguna.accessLevel, ability)) {
+    return { ok: false, error: "Akses Anda tidak mencakup tindakan ini.", errors: {} };
+  }
+  return null;
 }
 
 /**
@@ -92,7 +136,10 @@ export async function verifyCredentials(
 ): Promise<User | null> {
   const produksi = process.env.NODE_ENV === "production";
   const alamat = email.trim().toLowerCase();
-  const user = (await getUsers()).find((u) => u.email.toLowerCase() === alamat);
+  const ditemukan = (await getUsers()).find((u) => u.email.toLowerCase() === alamat || u.name.toLowerCase() === alamat);
+  // Akun nonaktif diperlakukan persis seperti akun yang tidak ada — termasuk
+  // sandinya tetap diperiksa — supaya tidak bocor akun mana yang dinonaktifkan.
+  const user = ditemukan?.isActive ? ditemukan : undefined;
 
   // Sandi tetap diperiksa walau penggunanya tidak ada, supaya lama proses tidak
   // membocorkan email mana yang terdaftar.

@@ -23,10 +23,8 @@ export type LoginErrors = Partial<Record<LoginField, string>>;
  */
 export const PASSWORD_MIN = 8;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /** Satu-satunya pesan untuk kredensial salah, apa pun sebabnya. */
-export const PESAN_KREDENSIAL_SALAH = "Email atau kata sandi salah.";
+export const PESAN_KREDENSIAL_SALAH = "Identitas atau kata sandi salah.";
 
 export function emptyLoginDraft(): LoginDraft {
   return { email: "", password: "" };
@@ -36,8 +34,7 @@ export function validateLogin(draft: LoginDraft): LoginErrors {
   const errors: LoginErrors = {};
 
   const email = draft.email.trim();
-  if (email === "") errors.email = "Email wajib diisi.";
-  else if (!EMAIL.test(email)) errors.email = "Format email tidak valid.";
+  if (email === "") errors.email = "Email atau nama pengguna wajib diisi.";
 
   // Hanya "terisi atau tidak" — lihat catatan di PASSWORD_MIN.
   if (draft.password === "") errors.password = "Kata sandi wajib diisi.";

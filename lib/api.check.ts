@@ -16,8 +16,19 @@ import {
   getProjectDetail,
   getProjectType,
   getProjectTypes,
+  createAgenda,
+  createUser,
+  deleteAgenda,
+  emailTerpakai,
+  getAgenda,
+  getAgendaEntry,
   getDependencies,
   getProjects,
+  jumlahAdminAktif,
+  setUserAccessLevel,
+  setUserActive,
+  setUserPassword,
+  updateAgenda,
   getSummary,
   setDependencies,
   getTimeline,
@@ -27,6 +38,8 @@ import {
   updateUser,
 } from "./api";
 import { SEMUA } from "./filters";
+import { hashPassword } from "./password";
+import { verifyCredentials } from "./auth";
 import {
   progressHistory as mockProgress,
   projectDependencies as mockDependencies,
@@ -381,6 +394,136 @@ async function main() {
   // Kembalikan relasi awal supaya urutan pemeriksaan tidak saling mengotori.
   mockDependencies.length = 0;
   mockDependencies.push(...relasiSemula);
+
+  /* --- Kelola pengguna ------------------------------------------------------ */
+
+  const penggunaSemula = (await getUsers()).length;
+
+  // Email kembar ditolak, tanpa memandang huruf besar-kecil — kalau lolos, dua
+  // baris akan mewakili satu identitas login.
+  const akunAdmin = (await getUsers())[0];
+  assert.equal(await emailTerpakai(akunAdmin.email), true);
+  assert.equal(await emailTerpakai(akunAdmin.email.toUpperCase()), true);
+  assert.equal(await emailTerpakai("  " + akunAdmin.email + "  "), true);
+  assert.equal(await emailTerpakai("belumada@uji.co.id"), false);
+  // Mengabaikan diri sendiri, untuk kasus menyunting akun yang sudah ada.
+  assert.equal(await emailTerpakai(akunAdmin.email, akunAdmin.id), false);
+
+  const baru = await createUser(
+    { name: "Dewi Uji", email: "dewi.uji@jayasurvey.id", role: "Surveyor", accessLevel: "Anggota" },
+    "scrypt$16384$8$1$aa$bb"
+  );
+  assert.ok(baru);
+  assert.equal(baru.isActive, true);
+  assert.equal(baru.accessLevel, "Anggota");
+  assert.equal((await getUsers()).length, penggunaSemula + 1);
+
+  // Email yang sama ditolak walau kapitalisasinya berbeda.
+  assert.equal(
+    await createUser(
+      { name: "Kembar", email: "DEWI.UJI@jayasurvey.id", role: "", accessLevel: "Anggota" },
+      "scrypt$16384$8$1$aa$bb"
+    ),
+    null
+  );
+  assert.equal((await getUsers()).length, penggunaSemula + 1);
+
+  // Akun baru langsung bisa masuk dengan sandi yang diberikan admin.
+  await setUserPassword(baru.id, hashPassword("sandiAwalUji"));
+  assert.ok(await verifyCredentials(baru.email, "sandiAwalUji"));
+  assert.equal(await verifyCredentials(baru.email, "salah"), null);
+
+  // Dinonaktifkan: sandinya masih benar, tapi tetap ditolak — dan pesannya
+  // seragam supaya tidak bocor akun mana yang dinonaktifkan.
+  await setUserActive(baru.id, false);
+  assert.equal(await verifyCredentials(baru.email, "sandiAwalUji"), null);
+  // Hilang dari daftar aktif, tapi tetap ada di daftar penuh: namanya masih
+  // melekat di proyek dan komentar yang pernah dia buat.
+  assert.equal((await getUsers({ activeOnly: true })).some((u) => u.id === baru.id), false);
+  assert.equal((await getUsers()).some((u) => u.id === baru.id), true);
+
+  // Diaktifkan lagi: bisa masuk kembali tanpa perlu sandi baru.
+  await setUserActive(baru.id, true);
+  assert.ok(await verifyCredentials(baru.email, "sandiAwalUji"));
+
+  // Tingkat akses bisa dinaikkan dan diturunkan.
+  assert.equal((await setUserAccessLevel(baru.id, "Manager"))!.accessLevel, "Manager");
+  assert.equal((await getUsers()).find((u) => u.id === baru.id)!.accessLevel, "Manager");
+  await setUserAccessLevel(baru.id, "Anggota");
+
+  // Akun yang tidak ada tidak bisa agendaDiubah diam-diam.
+  assert.equal(await setUserAccessLevel(999_999, "Admin"), null);
+  assert.equal(await setUserActive(999_999, false), null);
+  assert.equal(await setUserPassword(999_999, "x"), false);
+
+  // Hitungan admin aktif dipakai menjaga admin terakhir.
+  const adminSemula = await jumlahAdminAktif();
+  assert.ok(adminSemula >= 1, "harus selalu ada admin aktif");
+  await setUserAccessLevel(baru.id, "Admin");
+  assert.equal(await jumlahAdminAktif(), adminSemula + 1);
+  // Dinonaktifkan berarti tidak lagi dihitung sebagai admin aktif.
+  await setUserActive(baru.id, false);
+  assert.equal(await jumlahAdminAktif(), adminSemula);
+  await setUserActive(baru.id, true);
+  await setUserAccessLevel(baru.id, "Anggota");
+
+  /* --- Agenda --------------------------------------------------------------- */
+
+  const agendaSemula = (await getAgenda()).length;
+  const proyekAgenda = (await getProjects())[0];
+
+  const agendaUji = await createAgenda({
+    userId: baru.id,
+    projectId: proyekAgenda.id,
+    kind: "Lapangan",
+    startDate: "2026-09-01",
+    endDate: "2026-09-03",
+    locationCity: "Muara Enim",
+    locationProvince: "Sumatera Selatan",
+    note: "Uji agenda.",
+    createdBy: akunAdmin.id,
+    updatedAt: "2026-09-01",
+  });
+  assert.ok(agendaUji.id > 0);
+  assert.equal((await getAgenda()).length, agendaSemula + 1);
+
+  // Dilengkapi nama orang dan proyeknya — berkas dan layar dibaca manusia.
+  const terlihat = (await getAgenda()).find((a) => a.id === agendaUji.id)!;
+  assert.equal(terlihat.user?.id, baru.id);
+  assert.equal(terlihat.project?.id, proyekAgenda.id);
+  // createdBy berbeda dari userId: Manager mengisikan untuk anggotanya.
+  assert.equal(terlihat.createdBy, akunAdmin.id);
+  assert.notEqual(terlihat.createdBy, terlihat.userId);
+
+  // Penyaringan rentang memakai irisan, bukan termuat seluruhnya.
+  assert.equal((await getAgenda({ start: "2026-09-03", end: "2026-09-10" })).some((a) => a.id === agendaUji.id), true);
+  assert.equal((await getAgenda({ start: "2026-08-01", end: "2026-09-01" })).some((a) => a.id === agendaUji.id), true);
+  assert.equal((await getAgenda({ start: "2026-09-04", end: "2026-09-10" })).some((a) => a.id === agendaUji.id), false);
+  // Penyaringan per orang.
+  assert.ok((await getAgenda({ userId: baru.id })).every((a) => a.userId === baru.id));
+
+  // Terurut dari yang paling awal.
+  const urut = (await getAgenda()).map((a) => a.startDate);
+  assert.deepEqual(urut, [...urut].sort());
+
+  // Perbarui.
+  const agendaDiubah = await updateAgenda(agendaUji.id, {
+    ...agendaUji,
+    kind: "Cuti",
+    projectId: null,
+    locationCity: "",
+    locationProvince: "",
+  });
+  assert.equal(agendaDiubah!.kind, "Cuti");
+  assert.equal(agendaDiubah!.projectId, null);
+  assert.equal((await getAgendaEntry(agendaUji.id))!.kind, "Cuti");
+  assert.equal(await updateAgenda(999_999, { ...agendaUji }), null);
+
+  // Hapus.
+  assert.equal(await deleteAgenda(agendaUji.id), true);
+  assert.equal(await deleteAgenda(agendaUji.id), false); // klik ganda tidak melapor sukses palsu
+  assert.equal(await getAgendaEntry(agendaUji.id), null);
+  assert.equal((await getAgenda()).length, agendaSemula);
 
   console.log("ok: api");
 }

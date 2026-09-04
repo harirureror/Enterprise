@@ -5,6 +5,7 @@ import ProjectCard from "@/components/ProjectCard";
 import StatCard from "@/components/StatCard";
 import { getMemberProfile } from "@/lib/api";
 import { deadlineLabel, formatCurrency, formatCurrencyShort, formatDate } from "@/lib/ui";
+import { requireAbility } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export async function generateMetadata({ params }: PageProps<"/tim/[id]">) {
 }
 
 export default async function ProfilAnggotaPage({ params }: PageProps<"/tim/[id]">) {
+  await requireAbility("lihat-tim");
+
   const { id } = await params;
   // Id non-angka ("abc") ikut jatuh ke notFound lewat NaN.
   const profil = await getMemberProfile(Number(id));

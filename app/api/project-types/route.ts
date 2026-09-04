@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getProjectTypes, getTypeBreakdown } from "@/lib/api";
 
 /**
@@ -10,6 +11,9 @@ import { getProjectTypes, getTypeBreakdown } from "@/lib/api";
  * Menjadikannya benar-benar dinamis perlu perubahan skema tersendiri.
  */
 export async function GET() {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const [types, breakdown] = await Promise.all([getProjectTypes(), getTypeBreakdown()]);
 
   return NextResponse.json({
@@ -25,6 +29,9 @@ export async function GET() {
 }
 
 export async function POST() {
+  const izin = await jagaRute("kelola-jenis");
+  if (!izin.ok) return izin.response;
+
   return NextResponse.json(
     {
       error:

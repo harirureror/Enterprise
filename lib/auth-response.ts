@@ -10,3 +10,15 @@ export function unauthorized() {
     { status: 401 }
   );
 }
+
+/**
+ * Balasan seragam untuk permintaan yang identitasnya sah tapi haknya tidak
+ * cukup. Dibedakan dari 401: 401 berarti "masuk dulu", 403 berarti "sudah
+ * masuk, memang bukan hak Anda" — dan pemanggil perlu bisa membedakannya.
+ */
+export function forbidden() {
+  return NextResponse.json(
+    { error: "Akses Anda tidak mencakup data ini." },
+    { status: 403 }
+  );
+}

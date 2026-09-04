@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { jagaSesi } from "@/lib/api-guard";
 import { getSession } from "@/lib/auth";
 import { unauthorized } from "@/lib/auth-response";
 
 /** GET /api/auth/me — profil pengguna yang sedang masuk (PRD bagian 7). */
 export async function GET() {
+  const izin = await jagaSesi();
+  if (!izin.ok) return izin.response;
+
   const sesi = await getSession();
   if (!sesi) return unauthorized();
 

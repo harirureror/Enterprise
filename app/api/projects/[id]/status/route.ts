@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { jagaRute } from "@/lib/api-guard";
 import { getProject, updateProjectStatus } from "@/lib/api";
 import { PROJECT_STATUSES, type ProjectStatus, isActiveStatus } from "@/lib/types";
 
@@ -28,6 +29,9 @@ const idTidakValid = NextResponse.json(
 const tidakDitemukan = NextResponse.json({ error: "Proyek tidak ditemukan." }, { status: 404 });
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const izin = await jagaRute("lihat-daftar");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
@@ -47,6 +51,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const izin = await jagaRute("ubah-semua-proyek");
+  if (!izin.ok) return izin.response;
+
   const id = await bacaId(params);
   if (id === null) return idTidakValid;
 
