@@ -503,4 +503,108 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_agenda_rentang ON agenda(start_date, end_date);
     `,
   },
+  {
+    id: 15,
+    name: "rencana-strategis",
+    up: `
+      -- Lapisan di atas proyek: ke mana divisi menuju, dan pasar mana yang
+      -- akan didekati. Tidak ada klien yang membayar dan tidak ada nilai
+      -- kontrak — keberhasilannya diukur dari langkah yang tuntas.
+      CREATE TABLE strategic_plans (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        title       TEXT NOT NULL,
+        summary     TEXT NOT NULL DEFAULT '',
+        -- Dua sumbu yang sengaja dipisah: apa kegiatannya, dan untuk apa.
+        kind        TEXT NOT NULL
+                      CHECK (kind IN ('Pelatihan', 'Riset', 'Kemitraan', 'Sertifikasi', 'Pemasaran')),
+        goal        TEXT NOT NULL
+                      CHECK (goal IN ('Penetrasi Pasar', 'Kesiapan Regulasi',
+                                      'Kapasitas Internal', 'Efisiensi Biaya')),
+        -- Sasaran pasar. Segmen tertutup supaya bisa disaring dan dijumlah;
+        -- wilayah teks bebas supaya sebangun dengan location_province.
+        segment     TEXT NOT NULL
+                      CHECK (segment IN ('Tambang', 'Perkebunan', 'Kehutanan', 'Infrastruktur',
+                                         'Energi', 'Instansi Pemerintah', 'Akademik', 'Lainnya')),
+        region      TEXT NOT NULL DEFAULT '',
+        partner     TEXT NOT NULL DEFAULT '',
+        status      TEXT NOT NULL
+                      CHECK (status IN ('Ide', 'Disetujui', 'Berjalan',
+                                        'Selesai', 'Ditunda', 'Dibatalkan')),
+        priority    TEXT NOT NULL CHECK (priority IN ('Tinggi', 'Sedang', 'Rendah')),
+        -- RESTRICT: penyusun rencana tidak boleh hilang tanpa disadari.
+        owner_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        -- Boleh NULL: sebuah ide belum tentu sudah punya tanggal.
+        start_date  TEXT CHECK (start_date IS NULL OR start_date LIKE '____-__-__'),
+        target_date TEXT CHECK (target_date IS NULL OR target_date LIKE '____-__-__'),
+        -- Ukuran keberhasilan, ditulis di depan supaya tidak dikarang di belakang.
+        outcome     TEXT NOT NULL DEFAULT '',
+        created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (target_date IS NULL OR start_date IS NULL OR target_date >= start_date)
+      );
+
+      -- Langkah pelaksanaan. Progres rencana diturunkan dari sini, tidak
+      -- pernah diketik orang.
+      CREATE TABLE plan_steps (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id     INTEGER NOT NULL REFERENCES strategic_plans(id) ON DELETE CASCADE,
+        title       TEXT NOT NULL,
+        -- SET NULL: langkah boleh dibuat sebelum ada yang ditugaskan.
+        owner_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        target_date TEXT CHECK (target_date IS NULL OR target_date LIKE '____-__-__'),
+        status      TEXT NOT NULL CHECK (status IN ('Belum', 'Berjalan', 'Selesai', 'Batal')),
+        note        TEXT NOT NULL DEFAULT '',
+        -- Urutan ditentukan orang, bukan tanggal: langkah bisa sengaja
+        -- berurutan walau tanggalnya belum diisi.
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Calon klien yang akan didekati. Corongnya sendiri, terpisah dari
+      -- pipeline proyek: yang di sini belum tentu pernah jadi proyek.
+      CREATE TABLE plan_prospects (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id    INTEGER NOT NULL REFERENCES strategic_plans(id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        contact    TEXT NOT NULL DEFAULT '',
+        region     TEXT NOT NULL DEFAULT '',
+        status     TEXT NOT NULL
+                     CHECK (status IN ('Belum dihubungi', 'Dihubungi', 'Presentasi',
+                                       'Negosiasi', 'Menjadi Klien', 'Tidak Lanjut')),
+        note       TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Satu rencana bisa melahirkan beberapa proyek, dan satu proyek bisa
+      -- melayani lebih dari satu rencana. Bentuknya sama dengan
+      -- project_dependencies.
+      CREATE TABLE plan_projects (
+        plan_id    INTEGER NOT NULL REFERENCES strategic_plans(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (plan_id, project_id)
+      );
+
+      -- Tabel sendiri, bukan menumpang comments: kolom project_id di sana
+      -- NOT NULL, dan melonggarkannya akan membuat setiap pembaca komentar
+      -- proyek harus menangani baris yang bukan miliknya.
+      CREATE TABLE plan_comments (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id    INTEGER NOT NULL REFERENCES strategic_plans(id) ON DELETE CASCADE,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        body       TEXT NOT NULL CHECK (length(trim(body)) BETWEEN 2 AND 1000),
+        created_at TEXT NOT NULL
+                     CHECK (created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+        posted_at  TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_plans_goal ON strategic_plans(goal);
+      CREATE INDEX idx_plans_segment ON strategic_plans(segment);
+      CREATE INDEX idx_plan_steps_plan ON plan_steps(plan_id, sort_order);
+      CREATE INDEX idx_plan_prospects_plan ON plan_prospects(plan_id, status);
+      CREATE INDEX idx_plan_comments_plan ON plan_comments(plan_id, posted_at);
+    `,
+  },
 ];

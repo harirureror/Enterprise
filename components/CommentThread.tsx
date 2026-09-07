@@ -2,14 +2,16 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { kirimKomentar } from "@/lib/actions";
-import type { CommentView } from "@/lib/api";
 import { COMMENT_MAX, type CommentErrors, validateComment } from "@/lib/comment-form";
 import { formatDate } from "@/lib/ui";
 
-/* Diskusi proyek. Urutannya terlama dulu supaya terbaca sebagai percakapan,
-   dan komentar milik pengguna yang sedang masuk diberi penanda supaya mudah
-   dibedakan dari komentar rekan. */
+/* Utas diskusi. Urutannya terlama dulu supaya terbaca sebagai percakapan, dan
+   komentar milik pengguna yang sedang masuk diberi penanda supaya mudah
+   dibedakan dari komentar rekan.
+
+   Dipakai dua tempat — proyek dan rencana strategis. Yang membedakan hanya
+   server action pengirimnya, jadi itu yang diterima sebagai prop; sisanya
+   sama persis dan tidak perlu digandakan. */
 
 function inisial(nama: string): string {
   return nama
@@ -20,15 +22,33 @@ function inisial(nama: string): string {
     .toUpperCase();
 }
 
+/**
+ * Bentuk terkecil yang dibutuhkan utas ini. Sengaja bukan CommentView milik
+ * proyek: komentar rencana punya planId, bukan projectId, dan sisanya sama —
+ * jadi yang diminta hanya bagian yang benar-benar dipakai.
+ */
+export type UtasKomentar = {
+  id: number;
+  userId: number;
+  body: string;
+  createdAt: string;
+  user: { id: number; name: string } | null;
+};
+
+export type KirimKomentar = (
+  body: string
+) => Promise<{ ok: true } | { ok: false; error: string; errors: CommentErrors }>;
+
 export default function CommentThread({
-  projectId,
   comments,
   currentUserId,
+  onKirim,
   bolehTulis = true,
 }: {
-  projectId: number;
-  comments: CommentView[];
+  comments: UtasKomentar[];
   currentUserId: number;
+  /** Server action pengirim, sudah terikat ke proyek atau rencana pemanggil. */
+  onKirim: KirimKomentar;
   /** Boleh menambah komentar? Membacanya tidak pernah dibatasi di sini. */
   bolehTulis?: boolean;
 }) {
@@ -59,7 +79,7 @@ export default function CommentThread({
 
     setSaving(true);
     try {
-      const hasil = await kirimKomentar(projectId, { body });
+      const hasil = await onKirim(body);
       if (!hasil.ok) {
         setErrors(hasil.errors);
         setGagal(hasil.error);

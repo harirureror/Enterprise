@@ -21,6 +21,8 @@ import {
 } from "@/lib/export/timeline-dataset";
 import { datasetToWord } from "@/lib/export/word";
 import { berkasMingguan } from "@/lib/export/weekly";
+import { berkasRencana } from "@/lib/export/plans";
+import * as store from "@/lib/db/store";
 import type { Project } from "@/lib/types";
 
 /* Ekspor berkas.
@@ -36,7 +38,7 @@ import type { Project } from "@/lib/types";
    (puluhan sampai ribuan baris) tambahan 33% dari base64 tidak terasa. */
 
 export type ExportFormat = "excel" | "word" | "pdf";
-export type ExportScope = "proyek" | "timeline" | "mingguan";
+export type ExportScope = "proyek" | "timeline" | "mingguan" | "rencana";
 
 export type ExportResult =
   | { ok: true; filename: string; mime: string; base64: string }
@@ -55,7 +57,7 @@ const EKSTENSI: Record<ExportFormat, string> = {
 };
 
 const FORMATS: ExportFormat[] = ["excel", "word", "pdf"];
-const SCOPES: ExportScope[] = ["proyek", "timeline", "mingguan"];
+const SCOPES: ExportScope[] = ["proyek", "timeline", "mingguan", "rencana"];
 
 function hariIni(): string {
   return new Date().toISOString().slice(0, 10);
@@ -104,7 +106,20 @@ export async function exportProjects(
     const tanggal = hariIni();
 
     const isi =
-      scope === "mingguan"
+      scope === "rencana"
+        ? await berkasRencana({
+            plans: store.plans.all(),
+            steps: store.planSteps.all(),
+            prospects: store.planProspects.all(),
+            // Seluruh proyek, bukan hasil saring layar: kaitan rencana-proyek
+            // tidak ada hubungannya dengan filter daftar proyek.
+            projects: await getProjects(),
+            planProjects: store.planProjects.all(),
+            users,
+            format,
+            tanggal,
+          })
+        : scope === "mingguan"
         ? await berkasMingguan({
             projects,
             users,

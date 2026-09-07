@@ -62,6 +62,8 @@ const HARAPAN: Record<AccessLevel, Record<Ability, boolean>> = {
     ekspor: true,
     "lihat-agenda": true,
     "isi-agenda-sendiri": true,
+    "lihat-rencana": true,
+    "kelola-rencana": true,
     "isi-agenda-orang-lain": true,
   },
   Owner: {
@@ -81,6 +83,8 @@ const HARAPAN: Record<AccessLevel, Record<Ability, boolean>> = {
     ekspor: true,
     "lihat-agenda": true,
     "isi-agenda-sendiri": false,
+    "lihat-rencana": true,
+    "kelola-rencana": false,
     "isi-agenda-orang-lain": false,
   },
   HR: {
@@ -100,6 +104,8 @@ const HARAPAN: Record<AccessLevel, Record<Ability, boolean>> = {
     ekspor: true,
     "lihat-agenda": true,
     "isi-agenda-sendiri": false,
+    "lihat-rencana": true,
+    "kelola-rencana": false,
     "isi-agenda-orang-lain": false,
   },
   Manager: {
@@ -119,6 +125,8 @@ const HARAPAN: Record<AccessLevel, Record<Ability, boolean>> = {
     ekspor: true,
     "lihat-agenda": true,
     "isi-agenda-sendiri": true,
+    "lihat-rencana": true,
+    "kelola-rencana": true,
     "isi-agenda-orang-lain": true,
   },
   Anggota: {
@@ -138,6 +146,8 @@ const HARAPAN: Record<AccessLevel, Record<Ability, boolean>> = {
     ekspor: true,
     "lihat-agenda": true,
     "isi-agenda-sendiri": true,
+    "lihat-rencana": true,
+    "kelola-rencana": false,
     "isi-agenda-orang-lain": false,
   },
 };
@@ -175,6 +185,23 @@ assert.ok(ACCESS_LEVELS.every((l) => can(l, "ekspor")));
 // Kelima peran boleh melihat agenda — itulah gunanya buat HR.
 assert.ok(ACCESS_LEVELS.every((l) => can(l, "lihat-agenda")));
 
+// Arah divisi boleh dibaca semua orang: anggota lapangan yang tahu ke mana
+// perusahaan menuju bekerja lebih nyambung.
+assert.ok(ACCESS_LEVELS.every((l) => can(l, "lihat-rencana")));
+
+// Yang menyusun rencana hanya Admin dan Manager.
+assert.deepEqual(
+  ACCESS_LEVELS.filter((l) => can(l, "kelola-rencana")),
+  ["Admin", "Manager"]
+);
+
+// Siapa pun yang boleh menyusun rencana harus bisa membukanya lebih dulu.
+for (const level of ACCESS_LEVELS) {
+  if (can(level, "kelola-rencana")) {
+    assert.ok(can(level, "lihat-rencana"), `${level} bisa menyusun tapi tak bisa melihat`);
+  }
+}
+
 // Owner benar-benar tidak menulis data proyek, tapi tetap bisa berkolaborasi.
 // Pembedaan inilah yang paling mudah rusak saat matriksnya disunting.
 const TULIS_PROYEK: Ability[] = [
@@ -186,6 +213,8 @@ const TULIS_PROYEK: Ability[] = [
 ];
 assert.ok(TULIS_PROYEK.every((a) => !can("Owner", a)));
 assert.equal(can("Owner", "kolaborasi"), true);
+// Owner mengawasi arah, tidak menyusunnya.
+assert.equal(can("Owner", "kelola-rencana"), false);
 
 // HR tidak punya tempat berkomentar, jadi tidak boleh punya kemampuannya.
 assert.equal(can("HR", "kolaborasi"), false);

@@ -31,7 +31,10 @@ export type Ability =
   // Agenda
   | "lihat-agenda"
   | "isi-agenda-sendiri"
-  | "isi-agenda-orang-lain";
+  | "isi-agenda-orang-lain"
+  // Rencana strategis
+  | "lihat-rencana"
+  | "kelola-rencana";
 
 export const ABILITIES: Ability[] = [
   "lihat-daftar",
@@ -51,6 +54,8 @@ export const ABILITIES: Ability[] = [
   "lihat-agenda",
   "isi-agenda-sendiri",
   "isi-agenda-orang-lain",
+  "lihat-rencana",
+  "kelola-rencana",
 ];
 
 /**
@@ -74,12 +79,13 @@ export const MATRIX: Record<AccessLevel, readonly Ability[]> = {
     "kolaborasi",
     "ekspor",
     "lihat-agenda",
+    "lihat-rencana",
   ],
 
   // Mengurus orang, bukan pekerjaan: cukup tahu proyek apa yang jalan dan siapa
   // sedang di mana. Tanpa angka keuangan, dan tanpa halaman detail — jadi tidak
   // punya tempat untuk berkomentar.
-  HR: ["lihat-daftar", "ekspor", "lihat-agenda"],
+  HR: ["lihat-daftar", "ekspor", "lihat-agenda", "lihat-rencana"],
 
   // Menjalankan divisi: seluruh proyek boleh dia ubah, dan dia boleh mengisikan
   // agenda anggotanya. Yang tidak boleh hanya mengelola akun.
@@ -100,6 +106,8 @@ export const MATRIX: Record<AccessLevel, readonly Ability[]> = {
     "lihat-agenda",
     "isi-agenda-sendiri",
     "isi-agenda-orang-lain",
+    "lihat-rencana",
+    "kelola-rencana",
   ],
 
   // Pelaksana: melihat semuanya supaya bisa berkoordinasi, tapi hanya mengubah
@@ -115,6 +123,7 @@ export const MATRIX: Record<AccessLevel, readonly Ability[]> = {
     "ekspor",
     "lihat-agenda",
     "isi-agenda-sendiri",
+    "lihat-rencana",
   ],
 };
 

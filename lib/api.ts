@@ -5,6 +5,9 @@ import {
   isActiveStatus,
   type AccessLevel,
   type AgendaEntry,
+  type PlanComment,
+  type PlanProspect,
+  type PlanStep,
   type ProgressEntry,
   type Project,
   type ProjectPriority,
@@ -15,9 +18,19 @@ import {
   type ProjectDependency,
   type Reminder,
   type ReminderSchedule,
+  type StrategicPlan,
   type User,
 } from "./types";
 import { type ProjectFilter, filterProjects } from "./filters";
+import * as store from "./db/store";
+import {
+  type Coverage,
+  type PlanProgress,
+  coverage,
+  needsAttention,
+  planProgress,
+  prospectWins,
+} from "./strategy";
 import {
   type Notification,
   type NotificationSeverity,
@@ -39,19 +52,6 @@ import {
   isDue,
   nextOccurrence,
 } from "./reminder-schedule";
-import {
-  agenda as mockAgenda,
-  comments as mockComments,
-  currentUser as mockCurrentUser,
-  credentials as mockCredentials,
-  progressHistory as mockProgress,
-  projectDependencies as mockDependencies,
-  projectTypes as mockTypes,
-  projects as mockProjects,
-  reminderSchedules as mockSchedules,
-  reminders as mockReminders,
-  users as mockUsers,
-} from "./mock-data";
 import { type ProjectSummary, type TypeStats, projectSummary, typeBreakdown } from "./summary";
 import {
   type MonthOverlap,
@@ -68,9 +68,12 @@ import {
 } from "./timeline";
 
 /**
- * Satu-satunya pintu data dashboard. Sekarang masih baca mock-data.
- * ponytail: fase backend tinggal ganti isi fungsi ini jadi query SQLite —
- * pemanggilnya (halaman + route handler) tidak perlu berubah.
+ * Satu-satunya pintu data dashboard.
+ *
+ * Penyimpanannya SQLite lewat lib/db/store.ts; berkas ini yang menyusun bentuk
+ * yang dipakai layar — prioritas diterapkan, relasi dilengkapi, angka
+ * diringkas. Pembagian itu disengaja: SQL terkumpul di satu tempat, aturan
+ * bisnis di tempat lain, dan keduanya bisa diuji sendiri-sendiri.
  */
 
 /**
@@ -85,7 +88,7 @@ import {
  * PIC tidak berubah hanya karena pengguna sedang memfilter tampilannya.
  */
 function terapkanPrioritas(projects: Project[]): Project[] {
-  const skor = scoreAll(projects, mockDependencies);
+  const skor = scoreAll(projects, store.dependencies.all());
   return projects.map((p) =>
     p.priorityMode === "auto" ? { ...p, priority: skor.get(p.id)!.level } : p
   );
@@ -93,7 +96,7 @@ function terapkanPrioritas(projects: Project[]): Project[] {
 
 /** Daftar proyek, opsional disaring. Tanpa argumen = seluruh proyek. */
 export async function getProjects(filter?: Partial<ProjectFilter>): Promise<Project[]> {
-  const semua = terapkanPrioritas(mockProjects);
+  const semua = terapkanPrioritas(store.projects.all());
   return filter ? filterProjects(semua, filter) : semua;
 }
 
@@ -114,10 +117,13 @@ export type FocusItem = {
  */
 export async function getFocusProjects(limit = 5): Promise<FocusItem[]> {
   const projects = await getProjects();
-  const skor = scoreAll(mockProjects, mockDependencies);
+  // Skor dan bentrok dihitung atas daftar penuh, bukan hasil saring — kalau
+  // tidak, urutannya berubah hanya karena tampilannya sedang difilter.
+  const semua = store.projects.all();
+  const skor = scoreAll(semua, store.dependencies.all());
   const users = await getUsers();
   // Bentrok jadwal PIC bukan lagi penyumbang skor, hanya pemecah seri.
-  const clash = ownerClashCounts(mockProjects);
+  const clash = ownerClashCounts(semua);
 
   return projects
     .filter((p) => isActiveStatus(p.status))
@@ -142,12 +148,14 @@ export async function getDependencies(projectId: number): Promise<DependencyView
   const projects = await getProjects();
   const cari = (id: number) => projects.find((p) => p.id === id);
 
+  const relasi = store.dependencies.all();
+
   return {
-    blocking: mockDependencies
+    blocking: relasi
       .filter((d) => d.blockerId === projectId)
       .map((d) => cari(d.blockedId))
       .filter((p): p is Project => p !== undefined),
-    blockedBy: mockDependencies
+    blockedBy: relasi
       .filter((d) => d.blockedId === projectId)
       .map((d) => cari(d.blockerId))
       .filter((p): p is Project => p !== undefined),
@@ -181,7 +189,7 @@ export async function setDependencies(
 
   // Relasi lama milik blocker ini dibuang dulu, supaya pemeriksaan lingkaran
   // menilai keadaan sesudah perubahan — bukan keadaan lama yang sudah usang.
-  const lainnya = mockDependencies.filter((d) => d.blockerId !== blockerId);
+  const lainnya = store.dependencies.all().filter((d) => d.blockerId !== blockerId);
   const calon: ProjectDependency[] = [];
 
   for (const id of diminta) {
@@ -191,8 +199,9 @@ export async function setDependencies(
     calon.push({ blockerId, blockedId: id });
   }
 
-  mockDependencies.length = 0;
-  mockDependencies.push(...lainnya, ...calon);
+  // Diganti sekaligus dalam satu transaksi: relasi setengah tersimpan akan
+  // membuat skor prioritas salah tanpa ada yang menyadarinya.
+  store.dependencies.replaceFor(blockerId, diminta);
   return { ok: true };
 }
 
@@ -267,7 +276,7 @@ export async function getProjectDetail(id: number): Promise<ProjectDetail | null
     owner: cariUser(project.ownerId),
     conflicts,
     history,
-    priority: scoreAll(mockProjects, mockDependencies).get(id)!,
+    priority: scoreAll(store.projects.all(), store.dependencies.all()).get(id)!,
     reminders: await getReminders(id),
     schedule: (await getSchedules(id))[0] ?? null,
     reminderStatus: await getReminderStatus(id),
@@ -277,38 +286,23 @@ export async function getProjectDetail(id: number): Promise<ProjectDetail | null
   };
 }
 
-/**
- * Simpan proyek baru. Sementara hanya menambah ke array mock-data, jadi isinya
- * hilang saat server dimulai ulang.
- * ponytail: fase database tinggal ganti jadi INSERT ke tabel projects.
- */
+/** Simpan proyek baru. Id-nya diberikan database, bukan dihitung pemanggil. */
 export async function createProject(input: Omit<Project, "id">): Promise<Project> {
-  const id = mockProjects.reduce((max, p) => Math.max(max, p.id), 0) + 1;
-  const project: Project = { ...input, id };
-  mockProjects.push(project);
-  return project;
+  return store.projects.insert(input);
 }
 
-/**
- * Perbarui proyek yang sudah ada. `null` kalau id-nya tidak ketemu.
- * ponytail: fase database tinggal ganti jadi UPDATE ke tabel projects.
- */
+/** Perbarui proyek yang sudah ada. `null` kalau id-nya tidak ketemu. */
 export async function updateProject(
   id: number,
   input: Omit<Project, "id">
 ): Promise<Project | null> {
-  const index = mockProjects.findIndex((p) => p.id === id);
-  if (index === -1) return null;
-
-  const project: Project = { ...input, id };
-  mockProjects[index] = project;
-  return project;
+  return store.projects.update(id, input);
 }
 
 /** Riwayat progres satu proyek, terbaru dulu. */
 export async function getProgressHistory(projectId: number): Promise<ProgressEntry[]> {
-  return mockProgress
-    .filter((e) => e.projectId === projectId)
+  return store.progress
+    .byProject(projectId)
     // Stempel waktu penuh dipakai lebih dulu supaya catatan di hari yang sama
     // tetap berurutan; id hanya jadi penentu terakhir.
     .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt) || b.id - a.id);
@@ -342,28 +336,22 @@ export async function addProgress(input: {
   progressPct: number;
   note: string;
 }): Promise<ProgressEntry | null> {
-  const index = mockProjects.findIndex((p) => p.id === input.projectId);
-  if (index === -1) return null;
+  if (store.projects.byId(input.projectId) === null) return null;
 
   const sekarang = new Date().toISOString();
   const hariIni = sekarang.slice(0, 10);
-  const entry: ProgressEntry = {
-    id: mockProgress.reduce((max, e) => Math.max(max, e.id), 0) + 1,
+
+  const entry = store.progress.insert({
     projectId: input.projectId,
     userId: input.userId,
     progressPct: input.progressPct,
     note: input.note,
     createdAt: hariIni,
     recordedAt: `${hariIni} ${sekarang.slice(11, 19)}`,
-  };
+  });
 
-  mockProgress.push(entry);
-  mockProjects[index] = {
-    ...mockProjects[index],
-    progressPct: input.progressPct,
-    updatedAt: hariIni,
-  };
-
+  // Progres proyeknya ikut disamakan dengan catatan terbaru.
+  store.projects.patch(input.projectId, { progress_pct: input.progressPct }, hariIni);
   return entry;
 }
 
@@ -375,27 +363,18 @@ export async function updateProjectStatus(
   id: number,
   status: ProjectStatus
 ): Promise<Project | null> {
-  const index = mockProjects.findIndex((p) => p.id === id);
-  if (index === -1) return null;
-
-  const project: Project = {
-    ...mockProjects[index],
-    status,
-    updatedAt: new Date().toISOString().slice(0, 10),
-  };
-  mockProjects[index] = project;
-  return project;
+  return store.projects.patch(id, { status }, new Date().toISOString().slice(0, 10));
 }
 
 /**
  * Hapus proyek. `false` kalau id-nya tidak ketemu.
- * ponytail: fase database tinggal ganti jadi DELETE dari tabel projects.
+ *
+ * Relasi ketergantungan dan riwayatnya ikut terhapus lewat ON DELETE CASCADE;
+ * agenda yang menunjuknya diputus jadi NULL, karena orangnya tetap pernah
+ * pergi ke sana.
  */
 export async function deleteProject(id: number): Promise<boolean> {
-  const index = mockProjects.findIndex((p) => p.id === id);
-  if (index === -1) return false;
-
-  mockProjects.splice(index, 1);
+  if (!store.projects.remove(id)) return false;
   return true;
 }
 
@@ -406,14 +385,18 @@ export async function deleteProject(id: number): Promise<boolean> {
  * bukan di sini secara diam-diam.
  */
 export async function getUsers(options: { activeOnly?: boolean } = {}): Promise<User[]> {
-  return options.activeOnly ? mockUsers.filter((u) => u.isActive) : mockUsers;
+  const semua = store.users.all();
+  return options.activeOnly ? semua.filter((u) => u.isActive) : semua;
 }
 
+/**
+ * Identitas cadangan saat REQUIRE_AUTH=0 — dipakai hanya oleh jalan pintas
+ * dev-fallback di lib/auth.ts, bukan oleh kode yang butuh "siapa yang sedang
+ * masuk". Yang itu memakai getSessionUser().
+ */
 export async function getCurrentUser(): Promise<User> {
-  // `mockCurrentUser` hanya menandai SIAPA yang aktif; datanya dibaca ulang dari
-  // daftar users. Mengembalikan referensi itu langsung membuat perubahan profil
-  // tidak terlihat, karena updateUser mengganti isi slot array dengan objek baru.
-  return mockUsers.find((u) => u.id === mockCurrentUser.id) ?? mockCurrentUser;
+  const semua = store.users.all();
+  return semua.find((u) => u.isActive) ?? semua[0];
 }
 
 /** Angka-angka kartu ringkasan di dashboard utama. */
@@ -424,12 +407,14 @@ export async function getSummary(): Promise<ProjectSummary> {
 /** Rincian per jenis proyek untuk halaman kelola jenis. */
 /** Keterangan seluruh jenis proyek, urut sesuai `sortOrder`. */
 export async function getProjectTypes(): Promise<ProjectTypeInfo[]> {
-  return [...mockTypes].sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
+  return store.projectTypes
+    .all()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
 }
 
 /** Satu jenis berdasarkan kodenya. `null` kalau kodenya tidak dikenal. */
 export async function getProjectType(code: string): Promise<ProjectTypeInfo | null> {
-  return mockTypes.find((t) => t.code === code) ?? null;
+  return store.projectTypes.byCode(code);
 }
 
 /**
@@ -442,11 +427,11 @@ export async function updateProjectType(
   code: string,
   input: { label: string; description: string; sortOrder: number }
 ): Promise<ProjectTypeInfo | null> {
-  const index = mockTypes.findIndex((t) => t.code === code);
+  const index = store.projectTypes.byCode(code) === null ? -1 : 0;
   if (index === -1) return null;
 
-  const info: ProjectTypeInfo = { ...mockTypes[index], ...input };
-  mockTypes[index] = info;
+  const info = store.projectTypes.update(code, input);
+  if (info === null) return null;
   return info;
 }
 
@@ -510,9 +495,8 @@ export async function getReminders(projectId: number): Promise<ReminderView[]> {
   const users = await getUsers();
   const cari = (uid: number) => users.find((u) => u.id === uid) ?? null;
 
-  return mockReminders
-    .filter((r) => r.projectId === projectId)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt) || b.id - a.id)
+  return store.reminders
+    .byProject(projectId)
     .map((r) => ({ ...r, to: cari(r.toUserId), from: cari(r.fromUserId) }));
 }
 
@@ -536,8 +520,7 @@ export async function createReminder(input: {
 
   const sekarang = new Date().toISOString();
   const tanggal = input.onDate ?? sekarang.slice(0, 10);
-  const reminder: Reminder = {
-    id: mockReminders.reduce((max, r) => Math.max(max, r.id), 0) + 1,
+  const reminder = store.reminders.insert({
     projectId: input.projectId,
     // Pengingat selalu ditujukan ke PIC proyek saat ini.
     toUserId: project.ownerId,
@@ -546,23 +529,21 @@ export async function createReminder(input: {
     channel: "in-app",
     createdAt: tanggal,
     sentAt: `${tanggal} ${sekarang.slice(11, 19)}`,
-  };
+  });
 
-  mockReminders.push(reminder);
   return reminder;
 }
 
 /** Jadwal pengingat sebuah proyek, yang aktif lebih dulu. */
 export async function getSchedules(projectId: number): Promise<ReminderSchedule[]> {
-  return mockSchedules
-    .filter((s) => s.projectId === projectId)
-    .sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.nextAt.localeCompare(b.nextAt));
+  const jadwal = store.schedules.byProject(projectId);
+  return jadwal === null ? [] : [jadwal];
 }
 
 /**
  * Buat atau perbarui jadwal. Satu proyek cukup satu jadwal aktif — mengatur
  * ulang berarti menimpa yang lama, bukan menumpuk pengingat baru di atasnya.
- * ponytail: fase database jadi UPSERT ke tabel reminders.
+ * Ditegakkan UNIQUE(project_id) di skema, jadi ini benar-benar upsert.
  */
 export async function saveSchedule(input: {
   projectId: number;
@@ -573,22 +554,18 @@ export async function saveSchedule(input: {
   if (!project) return null;
 
   const hariIni = new Date().toISOString().slice(0, 10);
-  const index = mockSchedules.findIndex((s) => s.projectId === input.projectId);
+  const lama = store.schedules.byProject(input.projectId);
 
-  const jadwal: ReminderSchedule = {
-    id: index === -1 ? mockSchedules.reduce((max, s) => Math.max(max, s.id), 0) + 1 : mockSchedules[index].id,
+  return store.schedules.save({
     projectId: input.projectId,
     toUserId: project.ownerId,
     frequency: input.frequency,
     nextAt: input.startDate,
     isActive: true,
-    createdAt: index === -1 ? hariIni : mockSchedules[index].createdAt,
-  };
-
-  if (index === -1) mockSchedules.push(jadwal);
-  else mockSchedules[index] = jadwal;
-
-  return jadwal;
+    // Tanggal pembuatan yang lama dipertahankan; mengatur ulang jadwal bukan
+    // berarti jadwalnya baru dibuat hari ini.
+    createdAt: lama?.createdAt ?? hariIni,
+  });
 }
 
 /** Hidupkan atau matikan jadwal tanpa menghapus setelannya. */
@@ -596,20 +573,19 @@ export async function setScheduleActive(
   projectId: number,
   isActive: boolean
 ): Promise<ReminderSchedule | null> {
-  const index = mockSchedules.findIndex((s) => s.projectId === projectId);
-  if (index === -1) return null;
+  const lama = store.schedules.byProject(projectId);
+  if (lama === null) return null;
 
-  const lama = mockSchedules[index];
   // Dihidupkan lagi setelah lama mati: tanggalnya dimajukan supaya tidak
   // langsung mengirim pengingat untuk periode yang sudah lewat.
   const hariIni = new Date().toISOString().slice(0, 10);
-  const nextAt = isActive
-    ? advancePast(lama.nextAt, lama.frequency as ReminderFrequency, hariIni)
-    : lama.nextAt;
-
-  const jadwal: ReminderSchedule = { ...lama, isActive, nextAt };
-  mockSchedules[index] = jadwal;
-  return jadwal;
+  if (isActive) {
+    store.schedules.setNextAt(
+      lama.id,
+      advancePast(lama.nextAt, lama.frequency as ReminderFrequency, hariIni)
+    );
+  }
+  return store.schedules.setActive(lama.id, isActive);
 }
 
 /** Pratinjau beberapa tanggal pengiriman berikutnya, untuk ditampilkan di form. */
@@ -645,11 +621,11 @@ function susunStatus(
   projectId: number,
   hariIni: string
 ): ReminderStatus {
-  const terkirim = mockReminders
-    .filter((r) => r.projectId === projectId)
+  const terkirim = store.reminders
+    .byProject(projectId)
     .map((r) => r.createdAt)
     .sort();
-  const jadwal = mockSchedules.find((s) => s.projectId === projectId) ?? null;
+  const jadwal = store.schedules.byProject(projectId);
   const aktif = jadwal?.isActive === true;
 
   return {
@@ -757,10 +733,12 @@ export async function getMemberProfile(userId: number): Promise<MemberProfile | 
 
   return {
     member,
-    contributions: mockProgress
+    contributions: store.progress
+      .all()
       .filter((e) => e.userId === userId)
       .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt) || b.id - a.id),
-    reminders: mockReminders
+    reminders: store.reminders
+      .all()
       .filter((r) => r.toUserId === userId)
       .sort((a, b) => b.sentAt.localeCompare(a.sentAt) || b.id - a.id)
       .map((r) => ({ ...r, to: cari(r.toUserId), from: cari(r.fromUserId) })),
@@ -776,16 +754,12 @@ export type CommentView = ProjectComment & {
 /** Komentar sebuah proyek, terlama dulu supaya terbaca sebagai percakapan. */
 export async function getComments(projectId: number): Promise<CommentView[]> {
   const users = await getUsers();
-  return mockComments
-    .filter((c) => c.projectId === projectId)
-    .sort((a, b) => a.postedAt.localeCompare(b.postedAt) || a.id - b.id)
+  return store.comments
+    .byProject(projectId)
     .map((c) => ({ ...c, user: users.find((u) => u.id === c.userId) ?? null }));
 }
 
-/**
- * Tambah komentar. `null` kalau proyeknya tidak ada.
- * ponytail: fase database jadi INSERT ke tabel comments.
- */
+/** Tambah komentar. `null` kalau proyeknya tidak ada. */
 export async function createComment(input: {
   projectId: number;
   userId: number;
@@ -794,17 +768,13 @@ export async function createComment(input: {
   if (!(await getProject(input.projectId))) return null;
 
   const sekarang = new Date().toISOString();
-  const comment: ProjectComment = {
-    id: mockComments.reduce((max, c) => Math.max(max, c.id), 0) + 1,
+  return store.comments.insert({
     projectId: input.projectId,
     userId: input.userId,
     body: input.body,
     createdAt: sekarang.slice(0, 10),
     postedAt: `${sekarang.slice(0, 10)} ${sekarang.slice(11, 19)}`,
-  };
-
-  mockComments.push(comment);
-  return comment;
+  });
 }
 
 export type AutoReminderRun = {
@@ -830,7 +800,7 @@ export async function runDueReminders(today?: string): Promise<AutoReminderRun> 
   const asOf = today ?? new Date().toISOString().slice(0, 10);
   const hasil: AutoReminderRun = { asOf, sent: [], skipped: [] };
 
-  for (const jadwal of mockSchedules) {
+  for (const jadwal of store.schedules.all()) {
     if (!jadwal.isActive || !isDue(jadwal.nextAt, asOf)) continue;
 
     const project = await getProject(jadwal.projectId);
@@ -887,13 +857,8 @@ export async function updateUser(
   id: number,
   input: { name: string; avatarUrl: string | null }
 ): Promise<User | null> {
-  const index = mockUsers.findIndex((u) => u.id === id);
-  if (index === -1) return null;
-
   // Email dan peran sengaja tidak ikut: keduanya urusan admin, bukan swalayan.
-  const user: User = { ...mockUsers[index], name: input.name, avatarUrl: input.avatarUrl };
-  mockUsers[index] = user;
-  return user;
+  return store.users.updateProfile(id, input.name, input.avatarUrl);
 }
 
 export type NotificationFeed = {
@@ -908,7 +873,7 @@ export type NotificationFeed = {
  * ponytail: fase database tinggal ganti sumbernya jadi query, aturannya tetap.
  */
 export async function getNotifications(): Promise<NotificationFeed> {
-  const items = buildNotifications(await getProjects(), mockProgress);
+  const items = buildNotifications(await getProjects(), store.progress.all());
   return { items, counts: countBySeverity(items), total: items.length };
 }
 
@@ -953,58 +918,41 @@ export type UserInput = {
     idx_users_email_lower di skema. `kecuali` untuk mengabaikan diri sendiri. */
 export async function emailTerpakai(email: string, kecuali?: number): Promise<boolean> {
   const alamat = email.trim().toLowerCase();
-  return mockUsers.some((u) => u.id !== kecuali && u.email.toLowerCase() === alamat);
+  return store.users.emailTaken(alamat, kecuali);
 }
 
 /** Berapa admin yang masih aktif. Dipakai menjaga admin terakhir. */
 export async function jumlahAdminAktif(): Promise<number> {
-  return mockUsers.filter((u) => u.isActive && u.accessLevel === "Admin").length;
+  return store.users.activeAdminCount();
 }
 
 export async function createUser(input: UserInput, passwordHash: string): Promise<User | null> {
   if (await emailTerpakai(input.email)) return null;
 
-  const id = mockUsers.reduce((max, u) => Math.max(max, u.id), 0) + 1;
-  const user: User = {
-    id,
-    name: input.name.trim(),
-    email: input.email.trim(),
-    avatarUrl: null,
-    role: input.role.trim(),
-    accessLevel: input.accessLevel,
-    isActive: true,
-  };
-  mockUsers.push(user);
-  mockCredentials.push({ userId: id, passwordHash, devOnly: false });
-  return user;
+  return store.users.insert(
+    {
+      name: input.name.trim(),
+      email: input.email.trim(),
+      avatarUrl: null,
+      role: input.role.trim(),
+      accessLevel: input.accessLevel,
+      isActive: true,
+    },
+    passwordHash
+  );
 }
 
 export async function setUserAccessLevel(id: number, level: AccessLevel): Promise<User | null> {
-  const index = mockUsers.findIndex((u) => u.id === id);
-  if (index === -1) return null;
-
-  const user: User = { ...mockUsers[index], accessLevel: level };
-  mockUsers[index] = user;
-  return user;
+  return store.users.setAccessLevel(id, level);
 }
 
 export async function setUserActive(id: number, aktif: boolean): Promise<User | null> {
-  const index = mockUsers.findIndex((u) => u.id === id);
-  if (index === -1) return null;
-
-  const user: User = { ...mockUsers[index], isActive: aktif };
-  mockUsers[index] = user;
-  return user;
+  return store.users.setActive(id, aktif);
 }
 
-/** Ganti hash sandi. Membuat kredensial baru kalau akunnya belum punya. */
+/** Ganti hash sandi. Hash disimpan di kolom users.password_hash. */
 export async function setUserPassword(id: number, passwordHash: string): Promise<boolean> {
-  if (!mockUsers.some((u) => u.id === id)) return false;
-
-  const index = mockCredentials.findIndex((c) => c.userId === id);
-  if (index === -1) mockCredentials.push({ userId: id, passwordHash, devOnly: false });
-  else mockCredentials[index] = { userId: id, passwordHash, devOnly: false };
-  return true;
+  return store.users.setPassword(id, passwordHash);
 }
 
 /* --- Agenda tim ------------------------------------------------------------ */
@@ -1034,7 +982,8 @@ export async function getAgenda(
   const users = await getUsers();
   const projects = await getProjects();
 
-  return mockAgenda
+  return store.agenda
+    .all()
     .filter((a) => {
       if (filter.userId !== undefined && a.userId !== filter.userId) return false;
       // Beririsan, bukan termuat seluruhnya: agenda yang mulai pekan lalu dan
@@ -1048,31 +997,288 @@ export async function getAgenda(
 }
 
 export async function createAgenda(input: Omit<AgendaEntry, "id">): Promise<AgendaEntry> {
-  const id = mockAgenda.reduce((max, a) => Math.max(max, a.id), 0) + 1;
-  const entry: AgendaEntry = { ...input, id };
-  mockAgenda.push(entry);
-  return entry;
+  return store.agenda.insert(input);
 }
 
 export async function updateAgenda(
   id: number,
   input: Omit<AgendaEntry, "id">
 ): Promise<AgendaEntry | null> {
-  const index = mockAgenda.findIndex((a) => a.id === id);
-  if (index === -1) return null;
-
-  const entry: AgendaEntry = { ...input, id };
-  mockAgenda[index] = entry;
-  return entry;
+  return store.agenda.update(id, input);
 }
 
 export async function getAgendaEntry(id: number): Promise<AgendaEntry | null> {
-  return mockAgenda.find((a) => a.id === id) ?? null;
+  return store.agenda.byId(id);
 }
 
 export async function deleteAgenda(id: number): Promise<boolean> {
-  const index = mockAgenda.findIndex((a) => a.id === id);
-  if (index === -1) return false;
-  mockAgenda.splice(index, 1);
-  return true;
+  return store.agenda.remove(id);
+}
+
+export type AgendaMove = {
+  id: number;
+  /** Pemilik baru; sama dengan yang lama kalau agendanya tidak berpindah orang. */
+  userId: number;
+  startDate: string;
+  endDate: string;
+};
+
+/**
+ * Pindahkan beberapa agenda sekaligus.
+ *
+ * Menolak seluruh permintaan kalau ada satu id yang tidak dikenal — memindahkan
+ * sebagian bar lalu melapor sukses akan meninggalkan bar terbelah dua tanggal.
+ */
+export async function moveAgendaEntries(
+  perubahan: AgendaMove[]
+): Promise<{ ok: true; jumlah: number } | { ok: false; error: string }> {
+  for (const p of perubahan) {
+    if (store.agenda.byId(p.id) === null) {
+      return { ok: false, error: "Ada agenda yang sudah tidak ada." };
+    }
+  }
+  return { ok: true, jumlah: store.agenda.moveMany(perubahan) };
+}
+
+/** Hapus beberapa agenda sekaligus; menolak seluruhnya kalau ada yang tidak ada. */
+export async function deleteAgendaEntries(
+  ids: number[]
+): Promise<{ ok: true; jumlah: number } | { ok: false; error: string }> {
+  for (const id of ids) {
+    if (store.agenda.byId(id) === null) {
+      return { ok: false, error: "Ada agenda yang sudah dihapus." };
+    }
+  }
+  return { ok: true, jumlah: store.agenda.removeMany(ids) };
+}
+
+
+/* --- Rencana strategis ----------------------------------------------------- */
+
+export type PlanView = StrategicPlan & {
+  owner: User | null;
+  /** Diturunkan dari langkah — tidak pernah disimpan; lihat lib/strategy.ts. */
+  progress: PlanProgress;
+  perluPerhatian: boolean;
+  /** Berapa prospek yang sudah jadi klien. */
+  prospekMenang: number;
+  prospekTotal: number;
+};
+
+function lengkapiPlan(
+  plan: StrategicPlan,
+  steps: PlanStep[],
+  prospects: PlanProspect[],
+  users: User[],
+  today?: string
+): PlanView {
+  const miliknya = steps.filter((s) => s.planId === plan.id);
+  const prospekNya = prospects.filter((p) => p.planId === plan.id);
+
+  return {
+    ...plan,
+    owner: users.find((u) => u.id === plan.ownerId) ?? null,
+    progress: planProgress(miliknya, today),
+    perluPerhatian: needsAttention(plan, miliknya, today),
+    prospekMenang: prospectWins(prospekNya),
+    prospekTotal: prospekNya.length,
+  };
+}
+
+export type PlanFilter = {
+  kind?: string;
+  goal?: string;
+  segment?: string;
+  status?: string;
+  ownerId?: number;
+};
+
+/** Seluruh rencana, sudah dilengkapi progres dan penanda perhatian. */
+export async function getPlans(filter: PlanFilter = {}): Promise<PlanView[]> {
+  const users = await getUsers();
+  const steps = store.planSteps.all();
+  const prospects = store.planProspects.all();
+
+  return store.plans
+    .all()
+    .filter(
+      (p) =>
+        (filter.kind === undefined || p.kind === filter.kind) &&
+        (filter.goal === undefined || p.goal === filter.goal) &&
+        (filter.segment === undefined || p.segment === filter.segment) &&
+        (filter.status === undefined || p.status === filter.status) &&
+        (filter.ownerId === undefined || p.ownerId === filter.ownerId)
+    )
+    .map((p) => lengkapiPlan(p, steps, prospects, users));
+}
+
+export type PlanStepView = PlanStep & { owner: User | null };
+export type PlanCommentView = PlanComment & { user: User | null };
+
+export type PlanDetail = {
+  plan: PlanView;
+  steps: PlanStepView[];
+  prospects: PlanProspect[];
+  /** Proyek nyata yang lahir dari rencana ini. */
+  projects: Project[];
+  /** Proyek yang bisa dipilih; seluruhnya kecuali yang sudah tertaut. */
+  projectCandidates: Project[];
+  comments: PlanCommentView[];
+};
+
+export async function getPlanDetail(id: number): Promise<PlanDetail | null> {
+  const plan = store.plans.byId(id);
+  if (!plan) return null;
+
+  const users = await getUsers();
+  const projects = await getProjects();
+  const steps = store.planSteps.byPlan(id);
+  const prospects = store.planProspects.byPlan(id);
+  const tertaut = store.planProjects.byPlan(id);
+
+  return {
+    plan: lengkapiPlan(plan, steps, prospects, users),
+    steps: steps.map((s) => ({
+      ...s,
+      owner: s.ownerId === null ? null : users.find((u) => u.id === s.ownerId) ?? null,
+    })),
+    prospects,
+    projects: projects.filter((p) => tertaut.includes(p.id)),
+    projectCandidates: projects,
+    comments: store.planComments
+      .byPlan(id)
+      .map((c) => ({ ...c, user: users.find((u) => u.id === c.userId) ?? null })),
+  };
+}
+
+export async function createPlan(input: Omit<StrategicPlan, "id">): Promise<StrategicPlan> {
+  return store.plans.insert(input);
+}
+
+export async function updatePlan(
+  id: number,
+  input: Omit<StrategicPlan, "id" | "createdBy">
+): Promise<StrategicPlan | null> {
+  return store.plans.update(id, input);
+}
+
+export async function deletePlan(id: number): Promise<boolean> {
+  return store.plans.remove(id);
+}
+
+/** Langkah, prospek, kaitan proyek, dan komentarnya ikut terhapus lewat CASCADE. */
+export async function getPlan(id: number): Promise<StrategicPlan | null> {
+  return store.plans.byId(id);
+}
+
+export async function getPlanSteps(planId: number): Promise<PlanStep[]> {
+  return store.planSteps.byPlan(planId);
+}
+
+export async function getPlanStep(id: number): Promise<PlanStep | null> {
+  return store.planSteps.byId(id);
+}
+
+/** Nomor urut ditentukan di sini, bukan dikirim klien. */
+export async function createPlanStep(
+  planId: number,
+  input: Omit<PlanStep, "id" | "planId" | "sortOrder">
+): Promise<PlanStep | null> {
+  if (store.plans.byId(planId) === null) return null;
+  return store.planSteps.insert({
+    ...input,
+    planId,
+    sortOrder: store.planSteps.nextSortOrder(planId),
+  });
+}
+
+export async function updatePlanStep(
+  id: number,
+  input: Omit<PlanStep, "id" | "planId">
+): Promise<PlanStep | null> {
+  return store.planSteps.update(id, input);
+}
+
+export async function setPlanStepStatus(
+  id: number,
+  status: PlanStep["status"]
+): Promise<PlanStep | null> {
+  return store.planSteps.setStatus(id, status);
+}
+
+export async function deletePlanStep(id: number): Promise<boolean> {
+  return store.planSteps.remove(id);
+}
+
+export async function getPlanProspects(planId: number): Promise<PlanProspect[]> {
+  return store.planProspects.byPlan(planId);
+}
+
+export async function getPlanProspect(id: number): Promise<PlanProspect | null> {
+  return store.planProspects.byId(id);
+}
+
+export async function createPlanProspect(
+  input: Omit<PlanProspect, "id">
+): Promise<PlanProspect | null> {
+  if (store.plans.byId(input.planId) === null) return null;
+  return store.planProspects.insert(input);
+}
+
+export async function updatePlanProspect(
+  id: number,
+  input: Omit<PlanProspect, "id" | "planId">
+): Promise<PlanProspect | null> {
+  return store.planProspects.update(id, input);
+}
+
+export async function deletePlanProspect(id: number): Promise<boolean> {
+  return store.planProspects.remove(id);
+}
+
+/**
+ * Tetapkan proyek mana saja yang lahir dari rencana ini, menggantikan daftar
+ * lama. Proyek yang tidak ada diabaikan diam-diam? Tidak — ditolak, supaya
+ * kaitan yang salah ketik tidak hilang tanpa jejak.
+ */
+export async function setPlanProjects(
+  planId: number,
+  projectIds: number[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (store.plans.byId(planId) === null) {
+    return { ok: false, error: "Rencana tidak ditemukan." };
+  }
+
+  const diminta = [...new Set(projectIds)];
+  const semua = await getProjects();
+  for (const id of diminta) {
+    if (!semua.some((p) => p.id === id)) {
+      return { ok: false, error: "Ada proyek yang tidak ditemukan." };
+    }
+  }
+
+  store.planProjects.replaceFor(planId, diminta);
+  return { ok: true };
+}
+
+export async function createPlanComment(input: {
+  planId: number;
+  userId: number;
+  body: string;
+}): Promise<PlanComment | null> {
+  if (store.plans.byId(input.planId) === null) return null;
+
+  const sekarang = new Date().toISOString();
+  return store.planComments.insert({
+    planId: input.planId,
+    userId: input.userId,
+    body: input.body,
+    createdAt: sekarang.slice(0, 10),
+    postedAt: `${sekarang.slice(0, 10)} ${sekarang.slice(11, 19)}`,
+  });
+}
+
+/** Jangkauan wilayah: yang sudah ada proyeknya vs yang baru jadi sasaran. */
+export async function getCoverage(): Promise<Coverage[]> {
+  return coverage(await getProjects(), store.plans.all(), store.planProspects.all());
 }

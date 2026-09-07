@@ -2,7 +2,7 @@ import Link from "next/link";
 import FocusList from "@/components/FocusList";
 import ProjectList from "@/components/ProjectList";
 import StatusSummary from "@/components/StatusSummary";
-import { getFocusProjects, getProjects, getSummary } from "@/lib/api";
+import { getFocusProjects, getProjects, getSummary, getUsers } from "@/lib/api";
 import { requireAbility } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { deadlineLabel, sortByPriority } from "@/lib/ui";
@@ -13,10 +13,11 @@ export default async function DashboardPage() {
   const pengguna = await requireAbility("lihat-overview");
 
   // Sumber angka sama dengan GET /api/projects/summary, tanpa lompat HTTP dari server.
-  const [projects, summary, fokus] = await Promise.all([
+  const [projects, summary, fokus, anggota] = await Promise.all([
     getProjects(),
     getSummary(),
     getFocusProjects(5),
+    getUsers(),
   ]);
 
   /* Anggota melihat seluruh daftar sama seperti yang lain, tapi yang paling
@@ -119,7 +120,7 @@ export default async function DashboardPage() {
       </section>
 
       <div className="mt-10">
-        <ProjectList projects={projects} />
+        <ProjectList projects={projects} owners={anggota} />
       </div>
     </div>
   );

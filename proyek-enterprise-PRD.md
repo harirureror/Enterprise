@@ -43,8 +43,10 @@ Tujuan utamanya adalah meningkatkan transparansi, efisiensi koordinasi, dan mema
 | F17 | Pengaturan Tema & Tampilan | Pengguna dapat memilih mode tampilan (Dark Mode / Light Mode) atau preferensi tema warna aksen antarmuka untuk kenyamanan visual, dan preferensi ini tersimpan di sistem/lokal |
 | F19 | Tingkat Akses & Peran | Lima tingkat akses (Admin, Owner, HR, Manager, Anggota) di kolom `access_level`, terpisah dari `role` yang berisi jabatan bebas. Navigasi, halaman, dan tombol menyesuaikan peran; penegakannya di server, bukan sekadar menyembunyikan tombol |
 | F20 | Kelola Pengguna | Admin dapat menambah akun beserta sandi awal, menyetel ulang sandi, mengubah tingkat akses, dan menonaktifkan akun. Menyetel sandi dan mengubah akses selalu mencabut sesi berjalan |
-| F21 | Agenda Tim | Manager dan Anggota mencatat agenda (Lapangan/Kantor/Perjalanan/Cuti) berikut tanggal, lokasi, dan proyek terkait. Manager dapat mengisikan untuk anggotanya. Seluruh peran dapat melihatnya — inilah cara HR tahu siapa sedang di mana |
+| F21 | Agenda Tim | Manager dan Anggota mencatat agenda (Lapangan/Kantor/Perjalanan/Cuti) berikut tanggal, lokasi, dan proyek terkait. Manager dapat mengisikan untuk anggotanya. Seluruh peran dapat melihatnya — inilah cara HR tahu siapa sedang di mana. Sejak F23 agenda menjadi sub-tab di menu "Rencana & Agenda" (`/rencana/agenda`); `/agenda` dialihkan permanen ke sana. Dua tampilan: petak Kalender (1 minggu sampai 1 tahun atau rentang bebas) dan Papan Tim per anggota (mingguan). Agenda bisa diseret dan dicentang untuk dihapus massal; form muncul sebagai popover saat agenda atau tanggal diklik (lihat 3f) |
 | F22 | Laporan Mingguan | Ekspor Excel/Word/PDF berisi ringkasan pekan: proyek telat, tenggat 7 hari, selesai pekan ini, agenda tim, dan bentrok PIC. Terbuka untuk semua peran; kolom keuangan menyesuaikan hak masing-masing |
+| F23 | Rencana Strategis | Divisi mencatat rencana yang belum berkontrak — pelatihan, riset, kemitraan — berikut langkah pelaksanaan, calon klien yang akan didekati, dan proyek nyata yang lahir darinya. Diklasifikasi dua sumbu: jenis kegiatan x tujuan strategis. Progres diturunkan dari langkah, tidak diketik. Semua peran melihat; Admin dan Manager menyusun; Owner tetap bisa berkomentar (lihat 3e) |
+| F24 | Ringkasan Jangkauan | Tiap wilayah menampilkan jumlah proyek berjalan, rencana yang menyasar ke sana, dan calon klien. Wilayah yang sudah ada rencananya tapi belum ada proyeknya ditempatkan paling atas sebagai wilayah yang sedang dituju |
 | F18 | Ekspor Data & Timeline | Daftar proyek dan timeline dapat diunduh sebagai Excel (.xlsx), Word (.docx), atau PDF. Ekspor mengikuti filter dan urutan yang sedang tampil di layar; nilainya tetap dibaca ulang di server sehingga berkas tidak pernah memuat angka yang sudah usang |
 
 ### Kebutuhan Non-Fungsional
@@ -157,17 +159,17 @@ Dua parameter memetakan langsung ke skor:
 
 ## 3b. Ekspor Berkas
 
-Tiga format, dua cakupan (daftar proyek dan timeline). Berkasnya dibuat di server
+Tiga format, empat cakupan (daftar proyek, timeline, laporan mingguan, dan rencana strategis). Berkasnya dibuat di server
 lewat **server action**, bukan route handler — alasannya sama dengan `lib/actions.ts`:
 route handler punya salinan modul sendiri, jadi berkas yang dibuat di sana akan
 memuat data awal, bukan perubahan yang baru disimpan orang lewat form. Ekspor yang
 diam-diam basi lebih berbahaya daripada ekspor yang gagal.
 
-| Format | Daftar Proyek | Timeline |
-|---|---|---|
-| Excel (.xlsx) | Seluruh kolom, angka sebagai angka, baris kepala dibekukan | 3 lembar: jadwal, bentrok jadwal, bentrok PIC |
-| Word (.docx) | Tabel kolom inti, halaman bentang | Tabel jadwal + rincian bentrok |
-| PDF | Tabel kolom inti, berhalaman, kepala tabel diulang | **Gantt chart** dengan penanda bulan dan legenda prioritas |
+| Format | Daftar Proyek | Timeline | Rencana Strategis |
+|---|---|---|---|
+| Excel (.xlsx) | Seluruh kolom, angka sebagai angka, baris kepala dibekukan | 3 lembar: jadwal, bentrok jadwal, bentrok PIC | 4 lembar: Rencana, Langkah, Prospek, Jangkauan |
+| Word (.docx) | Tabel kolom inti, halaman bentang | Tabel jadwal + rincian bentrok | Tabel rencana + bagian Langkah, Prospek, Jangkauan |
+| PDF | Tabel kolom inti, berhalaman, kepala tabel diulang | **Gantt chart** dengan penanda bulan dan legenda prioritas | Satu tabel bergabung dengan kolom penanda bagian |
 
 **Yang perlu dicatat:**
 
@@ -187,6 +189,9 @@ diam-diam basi lebih berbahaya daripada ekspor yang gagal.
 - Font standar PDF hanya mengenal WinAnsi. Nama proyek datang dari isian orang,
   jadi teksnya dijinakkan lebih dulu (`aman()`) — berkas dengan satu tanda tanya
   jauh lebih baik daripada ekspor yang gagal total.
+- **Ekspor rencana tidak punya kolom keuangan sama sekali**, jadi penyaringan
+  `lihat-keuangan` memang tidak berlaku di sana. Itu keputusan, bukan kelalaian,
+  jadi dikunci satu assertion di `lib/export.check.ts`.
 - Ekspor **mengikuti filter di layar** lewat daftar id, tapi nilainya dibaca ulang
   di server. Kolom yang disembunyikan di tabel **tetap ikut** ke Excel: menyembunyikan
   kolom itu soal ruang layar, bukan soal apa yang mau dibawa keluar.
@@ -216,9 +221,11 @@ seseorang akan diam-diam mengganti haknya juga.
 | Lihat agenda semua orang | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Isi agenda sendiri | ✅ | ❌ | ❌ | ✅ | ✅ |
 | Isi agenda orang lain | ✅ | ❌ | ❌ | ✅ | ❌ |
+| Lihat rencana strategis | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Susun / ubah rencana strategis | ✅ | ❌ | ❌ | ✅ | ❌ |
 
 Matriksnya ditulis sekali sebagai fungsi murni di `lib/permissions.ts` dan dikunci
-85 assertion di `lib/permissions.check.ts`.
+`lib/permissions.check.ts`.
 
 **Penegakan berlapis, dan yang sungguhan ada di server:**
 
@@ -235,11 +242,353 @@ Di sistem ini `null` sudah berarti "belum diisi", jadi menimpanya akan berbohong
 kelengkapan data. Kolomnya dibuang sebelum berkas ekspor dibentuk dan kuncinya dihapus
 dari balasan JSON.
 
-**Catatan penting soal sesi:** `POST /api/auth/login` dan server action `masuk()`
-menulis ke penyimpanan sesi yang berbeda — route handler dan halaman punya salinan
-modul sendiri-sendiri (lihat catatan di `lib/actions.ts`). Sesi yang dibuat lewat REST
-hanya berlaku untuk endpoint REST; sesi dari form login hanya berlaku untuk halaman
-dan server action. Aplikasi memakai jalur kedua.
+**Catatan soal sesi:** sesi disimpan di tabel `sessions`, bukan di memori. Karena
+route handler dan halaman sama-sama membaca file database yang sama, sesi dari form
+login berlaku juga untuk endpoint REST dan sebaliknya — pemisahan yang dulu ada sudah
+tidak berlaku. Sesi juga bertahan saat server dimulai ulang.
+
+---
+
+## 3d. Penyimpanan Data
+
+Seluruh data aplikasi tersimpan di SQLite (`data/dashboard.db`) lewat `node:sqlite`
+bawaan Node — tanpa dependensi tambahan.
+
+**Pembagian tanggung jawab:**
+
+| Lapis | Berkas | Isinya |
+|---|---|---|
+| SQL | `lib/db/store.ts` | Satu-satunya tempat query berjalan saat aplikasi dipakai. Penerjemahan snake_case ⇄ camelCase terkumpul di sini. |
+| Aturan bisnis | `lib/api.ts` | Menyusun bentuk yang dipakai layar: prioritas diterapkan, relasi dilengkapi, angka diringkas. |
+| Skema | `lib/db/migrations.ts` | 14 migrasi, tidak pernah disunting setelah dirilis. |
+
+**`lib/mock-data.ts` sekarang hanya sumber seed**, bukan sumber data. Aplikasi tidak
+pernah membacanya saat berjalan.
+
+**Seed hanya mengisi database yang masih kosong.** Ini penting: database memuat data
+kerja yang sesungguhnya — sandi yang disetel admin, proyek yang disunting, agenda yang
+diisi orang. Kalau seed tetap memakai upsert seperti dulu, setiap `npx tsx lib/db/setup.ts`
+akan mengembalikan semuanya ke isi mock-data. Untuk sengaja membangun ulang data contoh:
+`npx tsx lib/db/setup.ts --force`.
+
+**Berkas check tidak menyentuh database nyata.** `lib/api.check.ts` dan
+`lib/session.check.ts` menyiapkan database di memori sendiri lewat `useDb()` di
+`lib/db/index.ts` — jahitan uji yang sengaja dibuat terlihat, bukan env yang dibaca
+diam-diam.
+
+---
+
+## 3e. Rencana Strategis
+
+Dashboard ini semula hanya melacak **pekerjaan yang sudah berjalan**. Dua hal yang
+menentukan pendapatan tahun depan tidak punya tempat: ke mana divisi menuju, dan
+pasar mana yang akan didekati. Keduanya hidup di kepala orang, dan sebagiannya
+setengah tercatat sebagai proyek (`Riset Carbon Stock`, `MOU ITERA`) sehingga niat
+dan pelaksanaannya tercampur di satu tempat yang bentuknya tidak cocok untuk keduanya.
+
+**Contoh nyata yang jadi acuan rancangan:**
+
+1. **Pelatihan Inspektur Tambang** — Pelatihan → Penetrasi Pasar. Tidak ada klien
+   yang membayar, tapi memperkenalkan metode kami kepada pihak yang menilai kepatuhan
+   perusahaan tambang.
+2. **Riset Arkeologi & Carbon Stock** — Riset → Kesiapan Regulasi. Aturan pemerintah
+   belum terbit; menyiapkan metodenya sekarang berarti begitu aturan keluar divisi
+   sudah punya rujukan, bukan baru mulai belajar.
+
+### Dua sumbu klasifikasi
+
+Satu sumbu tidak cukup: "Pelatihan" tidak memberi tahu untuk apa, dan "Penetrasi Pasar"
+tidak memberi tahu caranya. Jadi keduanya dicatat terpisah.
+
+| Sumbu | Nilai |
+|---|---|
+| Jenis kegiatan (`kind`) | Pelatihan, Riset, Kemitraan, Sertifikasi, Pemasaran |
+| Tujuan strategis (`goal`) | Penetrasi Pasar, Kesiapan Regulasi, Kapasitas Internal, Efisiensi Biaya |
+
+Daftar rencana dikelompokkan menurut **tujuan** — itu pertanyaan yang paling sering
+diajukan ke halaman ini.
+
+### Sasaran pasar
+
+Sasaran dicatat sebagai **segmen + wilayah + daftar calon klien**. Segmen tertutup
+(Tambang, Perkebunan, Kehutanan, Infrastruktur, Energi, Instansi Pemerintah, Akademik,
+Lainnya) supaya bisa disaring dan dijumlah; wilayah teks bebas supaya sebangun dengan
+`location_province` di `projects`.
+
+Calon klien punya corongnya sendiri (Belum dihubungi → Dihubungi → Presentasi →
+Negosiasi → Menjadi Klien / Tidak Lanjut), **terpisah** dari pipeline proyek: yang
+tercatat di sini belum tentu pernah jadi proyek, dan itu justru gunanya — pendekatan
+bisa dipantau satu per satu, bukan cuma diniatkan.
+
+### Ringkasan jangkauan
+
+Tiap wilayah dihitung tiga angka: proyek yang sudah berjalan di sana, rencana yang
+menyasar ke sana, dan calon klien di sana. Wilayah yang **ada rencananya tapi belum
+ada proyeknya** diurutkan paling atas — itulah wilayah yang sedang dituju, dan itulah
+alasan ringkasan ini ada.
+
+**Wilayah dicocokkan apa adanya** (setelah dipangkas dan disamakan huruf besar-kecilnya),
+tanpa pencocokan kira-kira. Jadi "Kepri" dan "Kepulauan Riau" tampil sebagai dua baris.
+Itu masalah keseragaman pengisian yang perlu **terlihat**, bukan disembunyikan
+penggabungan otomatis yang bisa saja salah.
+
+### Progres dihitung, tidak diketik
+
+Progres rencana diturunkan dari langkah-langkahnya, dengan alasan yang sama seperti
+margin di `lib/finance.ts`: angka yang disimpan akan melenceng dari langkahnya begitu
+salah satunya berubah. Langkah berstatus `Batal` tidak dihitung sebagai selesai
+**maupun** sebagai penyebut — membatalkan langkah bukan kegagalan, jadi tidak boleh
+menyeret persentasenya turun.
+
+Nomor urut (`sort_order`) adalah kunci pengurutan, bukan nomor yang ditampilkan; nomor
+di layar dan di laporan dihitung dari posisinya, sehingga tetap rapat walau ada langkah
+yang dihapus di tengah.
+
+### Kaitan rencana ↔ proyek
+
+Satu rencana bisa melahirkan beberapa proyek, dan satu proyek bisa melayani lebih dari
+satu rencana. Menghapus proyek **hanya memutus kaitannya** — rencananya tetap ada,
+sehingga arah divisi tidak ikut hilang saat daftar proyek dirapikan.
+
+### Agenda digabung
+
+Agenda Tim dan Rencana Strategis kini satu menu dengan dua sub-tab, karena keduanya
+menjawab pertanyaan yang bersebelahan: ke mana kita menuju, dan siapa sedang di mana
+untuk menjalankannya. Datanya tetap terpisah; yang disatukan pintu masuknya.
+
+| Rute | Isi | Penjaga |
+|---|---|---|
+| `/rencana` | Daftar rencana + ringkasan jangkauan | `lihat-rencana` |
+| `/rencana/baru`, `/rencana/[id]/ubah` | Formulir rencana | `kelola-rencana` |
+| `/rencana/[id]` | Detail: langkah, prospek, proyek terkait, diskusi | `lihat-rencana` |
+| `/rencana/agenda` | Agenda Tim (pindahan dari `/agenda`) | `lihat-agenda` |
+
+`/agenda` dialihkan permanen (308) ke `/rencana/agenda`, supaya tautan dan penanda
+lama tidak mati.
+
+### Hak akses
+
+| Kemampuan | Admin | Owner | HR | Manager | Anggota |
+|---|---|---|---|---|---|
+| `lihat-rencana` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `kelola-rencana` | ✅ | ❌ | ❌ | ✅ | ❌ |
+
+Komentar memakai `kolaborasi` yang sudah ada: Owner bisa menanggapi tanpa bisa
+mengubah, HR hanya membaca. Penegakannya di server action, bukan di tombol — sudah
+dibuktikan dengan memanggil `simpanRencana` dan `ubahStatusLangkah` langsung lewat
+HTTP sebagai Owner, HR, dan Anggota; ketiganya ditolak dan tidak ada satu baris pun
+yang tersimpan.
+
+### Ekspor
+
+Jenis ekspor tersendiri (`scope: "rencana"`), memakai ketiga perender Excel/Word/PDF
+yang sudah ada. Excel mendapat empat lembar: **Rencana**, **Langkah**, **Prospek**,
+dan **Jangkauan**. Tidak ada kolom keuangan sama sekali di ekspor ini, jadi penyaringan
+`lihat-keuangan` memang tidak berlaku — ditulis eksplisit di kode dan dikunci satu
+assertion supaya tidak terbaca sebagai kelalaian.
+
+---
+
+## 3f. Papan Agenda
+
+Papan agenda menggambar **satu bar memanjang per orang per proyek**, bukan satu
+kotak per hari. Sebelumnya agenda Senin-Rabu tampil sebagai tiga kotak yang
+bunyinya sama persis, dan tiga entri terpisah di proyek yang sama jadi sembilan
+kotak — papan yang seharusnya menjawab "siapa sedang di mana" penuh pengulangan.
+
+**Yang digabung hanya tampilannya.** Baris di `agenda` tidak pernah disatukan,
+jadi keputusan ini bisa dibalik tanpa kehilangan catatan per entri. Hitungannya
+di `lib/agenda.ts` (`mergeBars`, `assignLanes`, `weekBars`, `barSpan`), seluruhnya
+fungsi murni yang teruji tanpa DOM.
+
+**Kunci pengelompokan: orang + proyek + jenis kegiatan.**
+
+- `kind` ikut jadi kunci karena warna dan label bar **adalah** jenis kegiatannya.
+  Perjalanan dan Lapangan di proyek yang sama tetap dua bar; bar campuran tidak
+  punya warna yang jujur dan legenda jenis di atas papan jadi berbohong.
+- Entri **tanpa proyek** dikelompokkan per jenis saja — tidak ada proyek yang bisa
+  "sama", tapi dua blok Kantor berdampingan tetap layak menyatu.
+
+**Hanya yang bersambung yang menyatu.** Senin-Selasa dan Jumat di proyek yang sama
+tetap dua bar. Meleburnya jadi satu bar Senin-Jumat akan mengklaim orangnya ada di
+proyek itu Rabu-Kamis padahal tidak, dan papan ini dibaca HR untuk tahu siapa
+sedang di mana — kerapian tidak boleh dibayar dengan kebohongan.
+
+**Penggabungan dihitung dari seluruh entri, bukan hanya yang sepekan,** lalu bar
+yang menyentuh pekan itu yang ditampilkan; kalau dipotong lebih dulu, agenda yang
+membentang melewati batas pekan akan pecah jadi dua bar di dua pekan bersebelahan.
+
+**Bar yang isinya beririsan ditandai `bertumpuk`** — itu data ganda milik orang
+yang sama, bukan orang di dua tempat. Barnya menyatu supaya papan bersih, tapi
+penandanya tetap ada supaya sinyalnya tidak hilang.
+
+### Periode tampilan
+
+Papan tidak terkunci sepekan. Enam pilihan: **1 Minggu, 2 Minggu, 1 Bulan,
+3 Bulan, 1 Tahun**, dan **rentang khusus** dengan dua kolom tanggal bebas.
+
+**Semua preset disejajarkan kalender**, bukan "N hari dari hari ini": "1 Bulan"
+berarti September penuh, jadi "Berikutnya" berarti Oktober dan bukan mendarat di
+tengah bulan. Satu geseran memindahkan tepat satu satuan skalanya, dan periode
+berikutnya selalu mulai persis sehari setelah yang sekarang berakhir — tidak ada
+tumpang tindih maupun lubang.
+
+| Skala | Rentang |
+|---|---|
+| 1 Minggu | Senin–Minggu, memakai `weekRange()` yang sudah ada |
+| 2 Minggu | Senin, 14 hari |
+| 1 Bulan | tanggal 1 s/d hari terakhir bulan (29 di Februari kabisat) |
+| 3 Bulan | awal bulan acuan s/d akhir bulan ketiga |
+| 1 Tahun | 1 Januari s/d 31 Desember |
+| Khusus | apa adanya; tanggal akhir yang mendahului awalnya dijepit jadi sehari |
+
+**Bentuk papan diturunkan dari PANJANG rentang, bukan dari tombol yang ditekan.**
+Kalau diikat ke preset, rentang khusus dua tahun akan dipaksa muat layar dan jadi
+tidak terbaca. Ambangnya satu tempat, `AMBANG_TITIK = 120` hari:
+
+| Panjang rentang | Kepala kolom | Bentuk agenda | Lebar papan |
+|---|---|---|---|
+| ≤ 14 hari | per hari ("Sen 31/8") | bar berdurasi | muat layar |
+| 15–120 hari | per pekan ("31/8") | bar berdurasi | muat layar |
+| > 120 hari | per bulan ("Sep 26") | **titik berwarna** | menggulir, min. 4px/hari |
+
+Jadi 3 Bulan (91 hari) masih bar, sedangkan 1 Tahun dan rentang khusus yang
+panjang jatuh ke mode titik. Rentang khusus sepuluh hari tetap berlabel harian
+sama seperti tampilan sepekan — itulah gunanya ambang diturunkan dari rentangnya.
+
+**Mode titik**: satu titik = satu agenda, diletakkan di tanggal mulainya, diwarnai
+menurut jenis kegiatan. Di rentang sepanjang itu satu hari hanya beberapa piksel,
+jadi bar berdurasi tidak lagi membawa informasi yang bisa dibaca — dan **seret
+dimatikan**, karena satu piksel meleset berarti beberapa hari meleset. Yang tetap
+jalan: klik untuk membuka, `Enter`, `Spasi` untuk mencentang, dan hapus massal.
+**Pencentangan lewat `Spasi`, bukan kotak centang** — kotak centang tidak muat di
+dalam titik 10px, dan inilah yang dibayar padanan papan ketik sejak awal.
+
+### Dua tampilan
+
+Papan agenda punya dua bentuk karena ia menjawab dua pertanyaan yang berbeda,
+dan satu tata letak tidak bisa menjawab keduanya dengan baik.
+
+| Tampilan | Menjawab | Bentuk | Periode |
+|---|---|---|---|
+| **Kalender** (bawaan) | "apa yang terjadi kapan" | petak pekan, 7 kolom hari | 1 minggu – 1 tahun, atau rentang bebas |
+| **Papan Tim** | "siapa sedang di mana" | satu baris per anggota | **mingguan saja** |
+
+Papan Tim sengaja dikunci mingguan: hanya di rentang sependek itu bar per orang
+masih cukup lega untuk dibaca. Di rentang sebulan, bar per anggota menyusut jadi
+potongan yang labelnya terpotong — persis keluhan yang melahirkan tampilan
+kalender.
+
+### Petak kalender
+
+Baris = pekan, kolom = tujuh hari, seperti kalender pada umumnya. **Tiap baris
+pekan itu sendiri sebuah `RentangAgenda` tujuh hari**, jadi `barSpan()` yang
+sudah ada langsung menempatkan chip di dalamnya lengkap dengan pemotongan di
+kedua ujungnya — agenda yang melewati batas pekan otomatis terbelah jadi dua
+segmen bersambung, tanpa kode pemotongan tersendiri.
+
+Baris pekan sengaja melebar ke luar rentang (Senin sebelum tanggal 1, Minggu
+sesudah tanggal terakhir). Petak yang barisnya tidak utuh akan membuat kolom
+hari tidak sejajar dari baris ke baris; hari tetangga itu diredupkan lewat
+`diLuarRentang()`.
+
+Karena barisnya tanggal dan bukan orang, **nama anggota pindah ke dalam chip**
+("Harir · Lapangan · Riset Carbon Stock"). Sel yang chipnya lebih dari tiga
+jalur menampilkan "+N lainnya" yang membuka sisanya, meniru kalender umum.
+
+**Tampilan 1 tahun berganti bentuk**: lima puluh tiga baris pekan tidak bisa
+dibaca sebagai satu tampilan, jadi setahun digambar sebagai dua belas petak
+bulan kecil dengan **titik berwarna** menurut jenis kegiatan. Ambangnya tetap
+`AMBANG_TITIK`, dan tetap diturunkan dari panjang rentang — rentang khusus dua
+tahun pun jatuh ke bentuk yang sama.
+
+### Form sebagai popover
+
+Form tidak lagi menempel di bawah halaman. Ia muncul **hanya ketika ada yang
+diklik**, menempel pada apa yang diklik:
+
+| Yang diklik | Yang muncul |
+|---|---|
+| Tanggal kosong | Form agenda baru, tanggalnya sudah terisi |
+| Agenda berisi satu entri | Form ubah, langsung terisi |
+| Agenda gabungan | Daftar entri di dalamnya, masing-masing dengan tombol Ubah |
+| Tombol "+ Isi" di Papan Tim | Form agenda baru untuk anggota itu |
+
+Popover menjepit dirinya ke tepi layar dan membalik ke atas kalau tidak muat di
+bawah — popover yang separuh keluar layar sama saja dengan tidak muncul. Ditutup
+dengan `Esc` atau klik di luar. Lapisan penangkap kliknya **tidak digelapkan**:
+popover menempel pada tanggalnya, dan tanggal itu harus tetap terlihat.
+
+### Seret-lepas
+
+Ditulis dengan **Pointer Events**, bukan HTML5 drag-and-drop: satu API untuk
+tetikus, pena, dan sentuh, dan hanya itu yang bisa dipakai untuk gagang
+ubah-durasi. Tidak ada pustaka baru — proyek ini tetap tanpa dependensi UI.
+
+| Gerakan | Akibat |
+|---|---|
+| Seret chip/bar | Seluruh entri di dalamnya bergeser sejauh hari yang sama |
+| Seret bar ke baris lain (**Papan Tim**) | Seluruh entri berpindah pemilik |
+| Tarik gagang ujung | Mengubah durasi **entri di ujung itu saja** |
+| Klik (seretan nol) | Membuka popover: form kalau satu entri, daftar kalau gabungan |
+
+Di petak kalender tidak ada baris anggota untuk dijatuhi, jadi **memindahkan
+agenda ke orang lain hanya lewat form**; di Papan Tim, menyeret ke baris lain
+tetap bisa.
+
+**Sasaran seretan dihitung dari sel yang sedang ditunjuk pointer**, bukan dari
+selisih piksel dibagi lebar kolom. Di petak kalender satu langkah ke bawah
+berarti tujuh hari, dan aritmetika piksel akan meleset begitu tinggi baris tidak
+seragam.
+
+**Kehalusan seretan** datang dari dua hal: `pointermove` diredam ke satu frame
+lewat `requestAnimationFrame` — tanpa itu tiap kejadian memicu render dan
+seretan justru tersendat — dan chip diberi transisi posisi pendek sehingga tiap
+loncatan ke sel berikutnya meluncur, bukan berkedip.
+
+**Ubah durasi tidak pernah bisa menghapus entri.** Gagang kanan menggeser
+`endDate` entri terakhir, gagang kiri menggeser `startDate` entri pertama, dan
+keduanya dijepit `clampResize()` supaya tidak melewati entri itu sendiri.
+Gagang disembunyikan di sisi yang terpotong batas pekan: tepi yang terlihat di
+sana adalah batas pekan, bukan ujung agendanya.
+
+**Padanan papan ketik wajib, bukan tambahan.** `←/→` geser sehari, `Shift+←/→`
+ubah durasi, `Alt+↑/↓` pindah anggota, `Spasi` centang, `Enter` buka. Hasil tiap
+gerakan diumumkan lewat `aria-live`; tanpa itu fitur ini hanya bisa dipakai orang
+yang memakai tetikus.
+
+**Di ponsel tidak ada seret** — bar selebar layar HP lebih sering meleset daripada
+kena. Kartu per anggota tetap, bar gabungan jadi satu kartu, dan menggeser tanggal
+di sana tetap lewat form.
+
+### Hapus massal
+
+Kotak centang hanya dirender pada bar yang **seluruh isinya** boleh diubah
+pemakainya, dan mencentang bar mengambil seluruh entri di dalamnya. Bilah
+seleksi menyebut jumlah **entri**, bukan jumlah bar, supaya jelas berapa baris
+yang sebenarnya hilang.
+
+`hapusAgendaBanyak()` **menolak seluruh batch** kalau ada satu saja di luar hak
+pemakainya, dan menyebut berapa yang ditolak. Menghapus sebagian lalu diam akan
+membuat orang mengira pilihannya sudah bersih padahal belum.
+
+### Penegakan
+
+Ketiga server action (`geserAgenda`, `ubahRentangAgenda`, `hapusAgendaBanyak`)
+memakai penjaga yang sama dengan jalur form — menyeret bar bukan cara lain untuk
+mengubah agenda, hanya cara lain untuk memintanya.
+
+- **Klien hanya mengirim selisih hari, bukan tanggal jadi.** Tanggal barunya
+  dihitung server dari nilai tersimpan, sehingga tab yang lama terbuka tidak bisa
+  menuliskan hasil hitungan yang sudah usang. Selisihnya dibatasi ±370 hari.
+- **Penjaga dua sisi**: `canEditAgenda()` diperiksa untuk setiap entri yang
+  digeser **dan** untuk pemilik barunya. Tanpa pemeriksaan kedua, seseorang bisa
+  menyeret agendanya sendiri ke nama orang lain.
+- `ubahRentangAgenda()` diteruskan ke `perbaruiAgenda()` supaya aturan tanggal
+  tidak bercabang dari form.
+- Pemindahan dan penghapusan massal berjalan dalam **satu transaksi**
+  (`agenda.moveMany`, `agenda.removeMany`): gagal di tengah akan meninggalkan bar
+  terbelah dua tanggal — keadaan yang tidak bisa dibentuk lewat UI mana pun.
 
 ---
 
@@ -443,6 +792,62 @@ erDiagram
         datetime created_at
     }
 
+    STRATEGIC_PLANS {
+        int id PK
+        string title
+        text summary
+        string kind
+        string goal
+        string segment
+        string region
+        string partner
+        string status
+        string priority
+        int owner_id FK
+        date start_date
+        date target_date
+        text outcome
+        int created_by FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    PLAN_STEPS {
+        int id PK
+        int plan_id FK
+        string title
+        int owner_id FK
+        date target_date
+        string status
+        text note
+        int sort_order
+    }
+
+    PLAN_PROSPECTS {
+        int id PK
+        int plan_id FK
+        string name
+        string contact
+        string region
+        string status
+        text note
+        datetime updated_at
+    }
+
+    PLAN_PROJECTS {
+        int plan_id PK, FK
+        int project_id PK, FK
+        datetime created_at
+    }
+
+    PLAN_COMMENTS {
+        int id PK
+        int plan_id FK
+        int user_id FK
+        text body
+        datetime posted_at
+    }
+
     USER_PREFERENCES {
         int id PK
         int user_id FK
@@ -466,6 +871,11 @@ erDiagram
 - Kolom `client_tier` (`VIP`/`Strategis`/`Reguler`/`Baru`/`Internal`, default `Reguler`) dan `penalty_risk` (`Putus kontrak`/`Denda harian`/`Denda tetap`/`Teguran`/`Tidak ada`, default `Tidak ada`) adalah dua parameter prioritas yang tidak bisa disimpulkan sistem dari data lain — lihat §3a.  
 - Tabel `PROJECT_DEPENDENCIES` mencatat relasi "proyek A menahan proyek B", dengan `blocker_id` sebagai penahan. Kunci primernya gabungan kedua kolom (tidak bisa ganda) dan ada `CHECK` yang menolak proyek menahan dirinya sendiri. Lingkaran (A menahan B sekaligus B menahan A) tidak bisa dijaga SQLite, jadi ditolak di lapisan aplikasi sebelum disimpan.  
 - Tabel `REMINDERS` menyimpan jadwal notifikasi untuk setiap proyek.
+- `STRATEGIC_PLANS` dan turunannya mencatat arah divisi yang **belum berkontrak** — lihat §3e. `owner_id` dan `created_by` memakai `ON DELETE RESTRICT`: nama penyusun melekat di rencana, jadi menghilangkannya diam-diam akan memutus jejak.
+- `PLAN_STEPS.owner_id` memakai `ON DELETE SET NULL` — langkah boleh dibuat sebelum ada yang ditugaskan, dan pekerjaannya tetap ada walau orangnya sudah tidak.
+- Menghapus rencana ikut menghapus langkah, prospek, kaitan proyek, dan komentarnya (`CASCADE`); menghapus **proyek** hanya memutus kaitannya di `PLAN_PROJECTS`, sedangkan rencananya tetap ada.
+- **Progres rencana tidak dikolomkan.** Ia diturunkan dari `PLAN_STEPS` di `lib/strategy.ts`, dengan alasan yang sama seperti margin: angka yang disimpan akan melenceng dari langkahnya begitu salah satunya berubah.
+- `PLAN_COMMENTS` sengaja tabel sendiri, bukan menumpang `comments`: kolom `project_id` di sana `NOT NULL`, dan melonggarkannya akan memaksa setiap pembaca komentar proyek menangani baris yang bukan miliknya.
 
 ---
 
@@ -493,6 +903,10 @@ erDiagram
 | PUT | `/api/reminders/:id` | Mengubah jadwal pengingat |
 | DELETE | `/api/reminders/:id` | Menghapus jadwal pengingat |
 | GET | `/api/users` | Mendapatkan daftar anggota untuk kolaborasi |
+
+Rencana strategis (§3e) sengaja **tidak** punya endpoint REST: seluruh tulisnya lewat
+server action di `lib/plan-actions.ts`, dan bacanya lewat `lib/api.ts` langsung dari
+komponen server. Menambah pintu kedua berarti menduakan penjaganya.
 
 ---
 

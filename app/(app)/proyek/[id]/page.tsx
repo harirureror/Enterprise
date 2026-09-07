@@ -9,6 +9,7 @@ import ProjectStatusControl from "@/components/ProjectStatusControl";
 import ReminderForm from "@/components/ReminderForm";
 import ReminderScheduleForm from "@/components/ReminderScheduleForm";
 import ReminderStatusStrip from "@/components/ReminderStatusStrip";
+import { kirimKomentar } from "@/lib/actions";
 import { getProjectDetail } from "@/lib/api";
 import { requireAbility } from "@/lib/auth";
 import { can, canEditProject } from "@/lib/permissions";
@@ -577,9 +578,12 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
         </div>
         <div className="mt-3 rounded-xl border border-border bg-surface p-5 shadow-card">
           <CommentThread
-            projectId={project.id}
             comments={comments}
             currentUserId={pengguna.id}
+            onKirim={async (body) => {
+              "use server";
+              return kirimKomentar(project.id, { body });
+            }}
             bolehTulis={bolehKolaborasi}
           />
         </div>

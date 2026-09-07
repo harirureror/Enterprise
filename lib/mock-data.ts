@@ -1,11 +1,15 @@
 import type {
   AgendaEntry,
+  PlanProspect,
+  PlanStep,
+  StrategicPlan,
   Credential,
   ProjectDependency,
   ProgressEntry,
   Project,
   ProjectTypeInfo,
   ProjectComment,
+  ProjectPlanLink,
   Reminder,
   ReminderSchedule,
   User,
@@ -709,3 +713,79 @@ export const credentials: Credential[] = [
 ];
 
 export const projectDependencies: ProjectDependency[] = [];
+
+/* --- Rencana strategis -------------------------------------------------------
+
+   Dua rencana yang benar-benar sedang dibicarakan divisi, bukan contoh karangan.
+   Yang kedua sengaja ditautkan ke proyek "Riset Carbon Stock" dan "MOU ITERA"
+   yang sudah ada: itu memperlihatkan gunanya kaitan rencana-proyek, sekaligus
+   merapikan dua baris yang selama ini setengah tercatat sebagai proyek padahal
+   sebetulnya arah, bukan pekerjaan berkontrak. */
+
+export const strategicPlans: StrategicPlan[] = [
+  {
+    id: 1,
+    title: "Pelatihan Inspektur Tambang",
+    summary:
+      "Menyelenggarakan pelatihan pemetaan dan pemantauan tambang untuk Inspektur Tambang. Yang dikejar bukan uang pelatihannya, melainkan pengenalan metode kami kepada pihak yang menilai kepatuhan perusahaan tambang.",
+    kind: "Pelatihan",
+    goal: "Penetrasi Pasar",
+    segment: "Tambang",
+    region: "Kalimantan Timur",
+    partner: "Inspektur Tambang (Kementerian ESDM)",
+    status: "Disetujui",
+    priority: "Tinggi",
+    ownerId: 1,
+    startDate: "2026-09-15",
+    targetDate: "2026-12-19",
+    outcome:
+      "Dua angkatan pelatihan terselenggara dan minimal tiga perusahaan tambang meminta penawaran sesudahnya.",
+    createdBy: 1,
+    updatedAt: "2026-09-01",
+  },
+  {
+    id: 2,
+    title: "Riset Arkeologi & Carbon Stock",
+    summary:
+      "Riset bersama universitas untuk metode perhitungan carbon stock dan pemetaan situs arkeologi berbasis SLAM LiDAR. Aturan pemerintah untuk keduanya belum terbit; menyiapkan metodenya sekarang berarti begitu aturan keluar kami sudah punya rujukan, bukan baru mulai belajar.",
+    kind: "Riset",
+    goal: "Kesiapan Regulasi",
+    segment: "Akademik",
+    region: "Jawa Tengah",
+    partner: "Undip & ITERA",
+    status: "Berjalan",
+    priority: "Tinggi",
+    ownerId: 2,
+    startDate: "2026-08-30",
+    targetDate: "2027-03-31",
+    outcome:
+      "Satu metode terdokumentasi dan tervalidasi lapangan, siap diajukan sebagai rujukan saat aturan terbit.",
+    createdBy: 1,
+    updatedAt: "2026-09-01",
+  },
+];
+
+export const planSteps: PlanStep[] = [
+  { id: 1, planId: 1, title: "Susun silabus dan bahan pelatihan", ownerId: 1, targetDate: "2026-09-26", status: "Berjalan", note: "Fokus ke materi yang langsung dipakai saat inspeksi.", sortOrder: 0 },
+  { id: 2, planId: 1, title: "Audiensi dengan Inspektur Tambang", ownerId: 1, targetDate: "2026-10-10", status: "Belum", note: "", sortOrder: 1 },
+  { id: 3, planId: 1, title: "Pelatihan angkatan pertama", ownerId: 2, targetDate: "2026-11-21", status: "Belum", note: "", sortOrder: 2 },
+  { id: 4, planId: 1, title: "Evaluasi dan tindak lanjut peserta", ownerId: 1, targetDate: "2026-12-19", status: "Belum", note: "Peserta yang tertarik dicatat sebagai calon klien.", sortOrder: 3 },
+  { id: 5, planId: 2, title: "Kajian pustaka carbon stock dan arkeologi", ownerId: 2, targetDate: "2026-09-30", status: "Selesai", note: "", sortOrder: 0 },
+  { id: 6, planId: 2, title: "Uji lapangan SLAM LiDAR di petak contoh", ownerId: 3, targetDate: "2026-11-28", status: "Berjalan", note: "Berjalan bersama proyek Riset Carbon Stock.", sortOrder: 1 },
+  { id: 7, planId: 2, title: "Penandatanganan MOU dengan ITERA", ownerId: 2, targetDate: "2026-10-31", status: "Berjalan", note: "", sortOrder: 2 },
+  { id: 8, planId: 2, title: "Susun draf metode untuk diajukan", ownerId: 2, targetDate: "2027-03-31", status: "Belum", note: "", sortOrder: 3 },
+];
+
+export const planProspects: PlanProspect[] = [
+  { id: 1, planId: 1, name: "PT Kaltim Prima Coal", contact: "", region: "Kalimantan Timur", status: "Belum dihubungi", note: "Sasaran utama sesudah angkatan pertama.", updatedAt: "2026-09-01" },
+  { id: 2, planId: 1, name: "PT Berau Coal", contact: "", region: "Kalimantan Timur", status: "Belum dihubungi", note: "", updatedAt: "2026-09-01" },
+  { id: 3, planId: 1, name: "PT Adaro Indonesia", contact: "", region: "Kalimantan Selatan", status: "Belum dihubungi", note: "Wilayah baru, belum ada proyek di sana.", updatedAt: "2026-09-01" },
+  { id: 4, planId: 2, name: "Balai Pelestarian Kebudayaan Wilayah X", contact: "", region: "Jawa Tengah", status: "Dihubungi", note: "Pintu masuk pekerjaan pemetaan situs.", updatedAt: "2026-09-01" },
+  { id: 5, planId: 2, name: "Universitas Diponegoro", contact: "", region: "Jawa Tengah", status: "Menjadi Klien", note: "Sudah berjalan lewat proyek Riset Carbon Stock.", updatedAt: "2026-09-01" },
+];
+
+/** Kaitan ke proyek yang sudah ada: 1 = Riset Carbon Stock, 2 = MOU ITERA. */
+export const planProjects: ProjectPlanLink[] = [
+  { planId: 2, projectId: 1 },
+  { planId: 2, projectId: 2 },
+];

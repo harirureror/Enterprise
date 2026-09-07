@@ -26,7 +26,16 @@ import {
   timelineSummary,
 } from "./export/timeline-dataset";
 import { datasetToWord } from "./export/word";
-import { agenda as mockAgenda, projects as mockProjects, users as mockUsers } from "./mock-data";
+import {
+  agenda as mockAgenda,
+  planProjects as mockPlanProjects,
+  planProspects as mockPlanProspects,
+  planSteps as mockPlanSteps,
+  projects as mockProjects,
+  strategicPlans as mockPlans,
+  users as mockUsers,
+} from "./mock-data";
+import { KOLOM_RENCANA, berkasRencana } from "./export/plans";
 import { berkasMingguan } from "./export/weekly";
 import { FINANCE_FIELDS } from "./permissions";
 import type { AgendaEntry, Project, User } from "./types";
@@ -440,6 +449,82 @@ async function main() {
     (await PDFDocument.load(
       new Uint8Array(await berkasMingguan({ ...kosongArgs, format: "pdf" }))
     )).getPageCount() >= 1
+  );
+
+  /* --- Ekspor rencana strategis --------------------------------------------- */
+
+  const argRencana = {
+    plans: mockPlans,
+    steps: mockPlanSteps,
+    prospects: mockPlanProspects,
+    projects: mockProjects,
+    planProjects: mockPlanProjects,
+    users: mockUsers,
+    tanggal: ACUAN,
+  };
+
+  // Excel: keempat lembar benar-benar ada, dengan nama yang dijanjikan.
+  const rencanaExcel = isiZip(await berkasRencana({ ...argRencana, format: "excel" }));
+  const namaLembar = teksDari(rencanaExcel, /workbook\.xml$/);
+  for (const nama of ["Rencana", "Langkah", "Prospek", "Jangkauan"]) {
+    assert.ok(namaLembar.includes(nameSheet(nama)), `lembar ${nama} harus ada`);
+  }
+  assert.ok(rencanaExcel["xl/worksheets/sheet4.xml"], "empat lembar, bukan tiga");
+
+  // Isinya benar-benar terbawa, bukan sekadar kerangka lembar.
+  const teksExcel = teksDari(rencanaExcel, /sharedStrings\.xml$|xl\/worksheets\//);
+  assert.ok(teksExcel.includes("Pelatihan Inspektur Tambang"));
+  assert.ok(teksExcel.includes("Riset Arkeologi"), "judul rencana kedua ikut terbawa");
+
+  // Word: bagian Langkah dan Prospek memuat baris yang sama dengan di layar.
+  const rencanaWord = teksDari(
+    isiZip(await berkasRencana({ ...argRencana, format: "word" })),
+    /word\/document\.xml$/
+  );
+  assert.ok(rencanaWord.includes("Langkah"));
+  assert.ok(rencanaWord.includes("Prospek"));
+  assert.ok(rencanaWord.includes("Susun silabus"), "judul langkah ikut tercetak");
+  assert.ok(rencanaWord.includes("Kaltim Prima"), "calon klien ikut tercetak");
+
+  // PDF benar-benar bisa dimuat ulang, bukan hanya berukuran besar.
+  const rencanaPdf = await PDFDocument.load(
+    new Uint8Array(await berkasRencana({ ...argRencana, format: "pdf" }))
+  );
+  assert.ok(rencanaPdf.getPageCount() >= 1);
+
+  // Tidak ada kolom keuangan sama sekali di ekspor rencana — itu keputusan,
+  // bukan kelalaian, jadi diperiksa di sini supaya tidak diam-diam berubah.
+  for (const kunciUang of FINANCE_FIELDS) {
+    assert.equal(
+      KOLOM_RENCANA.map((c) => c.key).includes(kunciUang),
+      false,
+      `ekspor rencana tidak boleh memuat kolom keuangan ${kunciUang}`
+    );
+  }
+
+  // Daftar kosong tetap menghasilkan berkas yang bisa dibuka.
+  const rencanaKosong = {
+    plans: [],
+    steps: [],
+    prospects: [],
+    projects: [],
+    planProjects: [],
+    users: [],
+    tanggal: ACUAN,
+  };
+  assert.ok(isiZip(await berkasRencana({ ...rencanaKosong, format: "excel" }))["xl/worksheets/sheet1.xml"]);
+  assert.ok(
+    teksDari(
+      isiZip(await berkasRencana({ ...rencanaKosong, format: "word" })),
+      /word\/document\.xml$/
+    ).includes("Belum ada rencana strategis")
+  );
+  assert.ok(
+    (
+      await PDFDocument.load(
+        new Uint8Array(await berkasRencana({ ...rencanaKosong, format: "pdf" }))
+      )
+    ).getPageCount() >= 1
   );
 
   console.log("ok: export");

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Badge from "@/components/Badge";
 import ProjectCard from "@/components/ProjectCard";
 import StatCard from "@/components/StatCard";
-import { getMemberProfile } from "@/lib/api";
+import { getMemberProfile, getUsers } from "@/lib/api";
 import { deadlineLabel, formatCurrency, formatCurrencyShort, formatDate } from "@/lib/ui";
 import { requireAbility } from "@/lib/auth";
 
@@ -25,6 +25,7 @@ export default async function ProfilAnggotaPage({ params }: PageProps<"/tim/[id]
   const { id } = await params;
   // Id non-angka ("abc") ikut jatuh ke notFound lewat NaN.
   const profil = await getMemberProfile(Number(id));
+  const anggota = await getUsers();
   if (!profil) notFound();
 
   const { member, contributions, reminders, clashes } = profil;
@@ -105,7 +106,7 @@ export default async function ProfilAnggotaPage({ params }: PageProps<"/tim/[id]
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {member.projects.map((p) => (
-              <ProjectCard key={p.id} project={p} />
+              <ProjectCard key={p.id} project={p} owners={anggota} />
             ))}
           </div>
         )}

@@ -11,9 +11,13 @@ import {
   comments as mockComments,
   progressHistory as mockProgress,
   agenda as mockAgenda,
+  planProjects as mockPlanProjects,
+  planProspects as mockPlanProspects,
+  planSteps as mockPlanSteps,
   projects as mockProjects,
   reminderSchedules as mockSchedules,
   reminders as mockReminders,
+  strategicPlans as mockPlans,
   users as mockUsers,
 } from "../mock-data";
 import {
@@ -64,6 +68,11 @@ assert.ok(tabel.includes("sessions"));
 assert.ok(tabel.includes("user_preferences"));
 assert.ok(tabel.includes("project_dependencies"));
 assert.ok(tabel.includes("agenda"));
+assert.ok(tabel.includes("strategic_plans"));
+assert.ok(tabel.includes("plan_steps"));
+assert.ok(tabel.includes("plan_prospects"));
+assert.ok(tabel.includes("plan_projects"));
+assert.ok(tabel.includes("plan_comments"));
 // Notifikasi sengaja tidak punya tabel sendiri: isinya dihitung dari keadaan proyek.
 assert.equal(tabel.includes("notifications"), false);
 
@@ -117,6 +126,10 @@ assert.equal(jumlah.progress, mockProgress.length);
 assert.equal(jumlah.reminders, mockReminders.length);
 assert.equal(jumlah.schedules, mockSchedules.length);
 assert.equal(jumlah.comments, mockComments.length);
+assert.equal(jumlah.plans, mockPlans.length);
+assert.equal(jumlah.planSteps, mockPlanSteps.length);
+assert.equal(jumlah.planProspects, mockPlanProspects.length);
+assert.equal(jumlah.planProjects, mockPlanProjects.length);
 
 const hitung = (sql: string) => Number(db.prepare(sql).get()!.n);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM users"), mockUsers.length);
@@ -999,5 +1012,145 @@ assert.ok(indeksPengingat.includes("idx_schedules_due"));
 assert.ok(indeks.includes("idx_projects_deadline"));
 assert.ok(indeks.includes("idx_projects_owner"));
 
+/* --- Rencana strategis (migrasi 15) ------------------------------------------ */
+
+db.exec(
+  `INSERT INTO strategic_plans (id, title, kind, goal, segment, status, priority, owner_id, created_by)
+   VALUES (900, 'Uji rencana', 'Pelatihan', 'Penetrasi Pasar', 'Tambang', 'Ide', 'Sedang', 1, 1)`
+);
+
+// Enum tertutup: nilai di luar daftar ditolak database, bukan hanya formulir.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO strategic_plans (id, title, kind, goal, segment, status, priority, owner_id, created_by)
+       VALUES (901, 'Jenis asing', 'Piknik', 'Penetrasi Pasar', 'Tambang', 'Ide', 'Sedang', 1, 1)`
+    ),
+  "kind di luar daftar harus ditolak"
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO strategic_plans (id, title, kind, goal, segment, status, priority, owner_id, created_by)
+       VALUES (902, 'Tujuan asing', 'Pelatihan', 'Menang Banyak', 'Tambang', 'Ide', 'Sedang', 1, 1)`
+    ),
+  "goal di luar daftar harus ditolak"
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO strategic_plans (id, title, kind, goal, segment, status, priority, owner_id, created_by)
+       VALUES (903, 'Segmen asing', 'Pelatihan', 'Penetrasi Pasar', 'Peternakan', 'Ide', 'Sedang', 1, 1)`
+    ),
+  "segment di luar daftar harus ditolak"
+);
+
+// Target sebelum mulai itu mustahil, jadi ditolak skema — bukan hanya formulir.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO strategic_plans
+         (id, title, kind, goal, segment, status, priority, owner_id, created_by, start_date, target_date)
+       VALUES (904, 'Mundur', 'Pelatihan', 'Penetrasi Pasar', 'Tambang', 'Ide', 'Sedang', 1, 1,
+               '2026-10-01', '2026-09-01')`
+    ),
+  "target_date lebih awal dari start_date harus ditolak"
+);
+
+// Rencana tanpa tanggal tetap sah: sebuah ide belum tentu sudah berjadwal.
+db.exec(
+  `INSERT INTO strategic_plans (id, title, kind, goal, segment, status, priority, owner_id, created_by)
+   VALUES (905, 'Ide tanpa tanggal', 'Riset', 'Kesiapan Regulasi', 'Akademik', 'Ide', 'Rendah', 1, 1)`
+);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM strategic_plans WHERE id = 905"), 1);
+db.exec("DELETE FROM strategic_plans WHERE id = 905");
+
+// Status langkah dan status prospek juga tertutup.
+db.exec(
+  `INSERT INTO plan_steps (id, plan_id, title, status) VALUES (910, 900, 'Langkah uji', 'Belum')`
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO plan_steps (id, plan_id, title, status) VALUES (911, 900, 'Aneh', 'Nanti Saja')`
+    ),
+  "status langkah di luar daftar harus ditolak"
+);
+db.exec(
+  `INSERT INTO plan_prospects (id, plan_id, name, status)
+   VALUES (912, 900, 'PT Uji', 'Belum dihubungi')`
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO plan_prospects (id, plan_id, name, status) VALUES (913, 900, 'PT Aneh', 'Kenalan')`
+    ),
+  "status prospek di luar daftar harus ditolak"
+);
+
+// Komentar rencana dibatasi panjangnya di database, sama seperti comments.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO plan_comments (plan_id, user_id, body, created_at, posted_at)
+       VALUES (900, 1, ' ', '2026-09-01', '2026-09-01')`
+    ),
+  "komentar kosong harus ditolak"
+);
+db.exec(
+  `INSERT INTO plan_comments (id, plan_id, user_id, body, created_at, posted_at)
+   VALUES (914, 900, 1, 'Catatan uji', '2026-09-01', '2026-09-01')`
+);
+
+// PIC rencana tidak bisa dihapus selama masih dipakai (RESTRICT): namanya
+// melekat di rencana, jadi menghilangkannya diam-diam akan memutus jejak.
+assert.throws(
+  () => db.exec("DELETE FROM users WHERE id = 1"),
+  "owner_id rencana menahan penghapusan penggunanya"
+);
+
+// Langkah boleh belum ditugaskan, dan PIC yang dihapus menyisakan langkahnya
+// (SET NULL) — pekerjaannya tetap ada walau orangnya tidak.
+db.exec(`INSERT INTO users (id, email, name, role) VALUES (920, 'lepas@uji.co.id', 'Lepas', 'Staf')`);
+db.exec(
+  `INSERT INTO plan_steps (id, plan_id, title, owner_id, status)
+   VALUES (921, 900, 'Punya PIC', 920, 'Belum')`
+);
+db.exec("DELETE FROM users WHERE id = 920");
+assert.equal(db.prepare("SELECT owner_id FROM plan_steps WHERE id = 921").get()!.owner_id, null);
+
+// Menghapus PROYEK hanya memutus kaitannya; rencananya tetap ada. Inilah yang
+// membuat rencana aman dari perapian daftar proyek.
+db.exec(
+  `INSERT INTO projects (id, name, type, status, priority, start_date, deadline, owner_id)
+   VALUES (930, 'Proyek berencana', 'Jasa', 'Berjalan', 'Rendah', '2026-09-01', '2026-09-30', 1)`
+);
+db.exec("INSERT INTO plan_projects (plan_id, project_id) VALUES (900, 930)");
+db.exec("DELETE FROM projects WHERE id = 930");
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_projects WHERE project_id = 930"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM strategic_plans WHERE id = 900"), 1);
+
+// Sebaliknya, menghapus RENCANA membawa serta seluruh isinya (CASCADE) — tidak
+// ada langkah, prospek, kaitan, atau komentar yang menggantung.
+db.exec("DELETE FROM strategic_plans WHERE id = 900");
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_steps WHERE plan_id = 900"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_prospects WHERE plan_id = 900"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_comments WHERE plan_id = 900"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_projects WHERE plan_id = 900"), 0);
+
+const indeksRencana = db
+  .prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'index'
+     AND tbl_name IN ('strategic_plans', 'plan_steps', 'plan_prospects', 'plan_comments')`
+  )
+  .all()
+  .map((r) => String(r.name));
+assert.ok(indeksRencana.includes("idx_plans_goal"));
+assert.ok(indeksRencana.includes("idx_plans_segment"));
+assert.ok(indeksRencana.includes("idx_plan_steps_plan"));
+assert.ok(indeksRencana.includes("idx_plan_prospects_plan"));
+assert.ok(indeksRencana.includes("idx_plan_comments_plan"));
+
 db.close();
+
 console.log("ok: db schema + migrasi");

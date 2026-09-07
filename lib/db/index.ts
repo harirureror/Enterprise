@@ -41,3 +41,14 @@ export function closeDb(): void {
   cached?.close();
   cached = null;
 }
+
+/**
+ * Hanya untuk pengujian: pakai koneksi ini sebagai pengganti file utama.
+ *
+ * Ada sebagai jahitan yang terlihat, bukan lewat env yang dibaca diam-diam saat
+ * modul dimuat — dengan begitu berkas check bisa menyiapkan database sendiri
+ * tanpa pernah menyentuh data/dashboard.db.
+ */
+export function pakaiDb(db: DatabaseSync | null): void {
+  cached = db;
+}

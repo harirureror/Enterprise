@@ -7,6 +7,7 @@ import {
   PROJECT_STATUSES,
   type Project,
   type ProjectPriority,
+  type User,
   type ProjectStatus,
 } from "@/lib/types";
 import { sortByPriority } from "@/lib/ui";
@@ -15,7 +16,14 @@ import ProjectCard from "./ProjectCard";
 const selectClass =
   "rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
 
-export default function ProjectList({ projects }: { projects: Project[] }) {
+export default function ProjectList({
+  projects,
+  owners,
+}: {
+  projects: Project[];
+  /** Anggota, diturunkan server supaya kartu bisa menulis nama PIC. */
+  owners: User[];
+}) {
   const [status, setStatus] = useState<ProjectStatus | Semua>(SEMUA);
   const [priority, setPriority] = useState<ProjectPriority | Semua>(SEMUA);
 
@@ -81,7 +89,7 @@ export default function ProjectList({ projects }: { projects: Project[] }) {
       ) : (
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {filtered.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+            <ProjectCard key={p.id} project={p} owners={owners} />
           ))}
         </div>
       )}

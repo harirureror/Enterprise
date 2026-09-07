@@ -1,11 +1,20 @@
 import Link from "next/link";
-import type { Project } from "@/lib/types";
-import { getUser } from "@/lib/mock-data";
+import type { Project, User } from "@/lib/types";
+
 import { formatDate, priorityClass, statusClass, typeClass } from "@/lib/ui";
 import Badge from "./Badge";
 
-export default function ProjectCard({ project }: { project: Project }) {
-  const owner = getUser(project.ownerId);
+export default function ProjectCard({
+  project,
+  owners,
+}: {
+  project: Project;
+  /** Anggota untuk mencari nama PIC. */
+  owners: User[];
+}) {
+  // Nama PIC diturunkan pemanggil: komponen klien tidak boleh membaca data
+  // sendiri, dan sejak penyimpanannya SQLite ia memang tidak bisa.
+  const owner = owners.find((u) => u.id === project.ownerId) ?? null;
   const urgent = project.priority === "Tinggi";
   const highlight = urgent ? "border-high/30" : "border-border";
 

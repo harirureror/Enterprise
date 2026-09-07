@@ -11,7 +11,7 @@ export default async function TimelinePage() {
   await requireAbility("lihat-daftar");
 
   // Sumber data sama dengan GET /api/projects/timeline, tanpa lompat HTTP dari server.
-  const { projects, overlapPairs } = await getTimeline();
+  const { projects, users, overlapPairs } = await getTimeline();
 
   return (
     <div className="w-full">
@@ -24,7 +24,7 @@ export default async function TimelinePage() {
       </header>
 
       <div className="mt-6">
-        <TimelineChart projects={projects} />
+        <TimelineChart projects={projects} users={users} />
       </div>
     </div>
   );

@@ -1,12 +1,16 @@
 import { randomBytes } from "node:crypto";
+import { sessions } from "./db/store";
 
 /* Sesi bertoken. Cookie sebelumnya berisi id pengguna — siapa pun bisa menulis
    "2" dan menjadi orang lain. Token acak 256-bit menutup itu tanpa perlu
    menandatangani cookie: nilainya tidak bisa ditebak dan bisa dicabut.
 
-   ponytail: penyimpanan masih di memori (hilang saat server restart, dan tidak
-   dibagi antar instance). Bentuk datanya sudah sama dengan tabel `sessions`
-   di migrasi 9, jadi pindahnya tinggal mengganti isi fungsi-fungsi ini. */
+   Disimpan di tabel `sessions`, bukan di memori. Dua akibatnya:
+
+   1. Orang tetap masuk setelah server dimulai ulang.
+   2. Route handler dan halaman punya salinan modul sendiri-sendiri, tapi
+      keduanya membaca file database yang sama — jadi sesi yang dibuat lewat
+      form login kini juga berlaku untuk endpoint API, dan sebaliknya. */
 
 export type Session = {
   token: string;
@@ -24,8 +28,6 @@ const TOKEN_BYTES = 32;
 /** Bentuk token yang sah — dipakai juga middleware untuk menyaring lebih awal. */
 export const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
-const store = new Map<string, Session>();
-
 function nowPlus(hours: number): string {
   return new Date(Date.now() + hours * 3600_000).toISOString().replace("T", " ").slice(0, 19);
 }
@@ -41,54 +43,34 @@ export function createSession(userId: number): Session {
     createdAt: sekarang(),
     expiresAt: nowPlus(SESSION_TTL_HOURS),
   };
-  store.set(session.token, session);
+  sessions.insert(session.token, session.userId, session.expiresAt);
   return session;
 }
 
-/** Id pengguna dari token, atau `null` kalau tidak ada / sudah kedaluwarsa. */
+/**
+ * Id pengguna dari token, atau `null` kalau tidak ada / sudah kedaluwarsa.
+ * Kedaluwarsa disaring di query, jadi token basi tidak pernah lolos walau
+ * barisnya belum sempat dibersihkan.
+ */
 export function getSessionUserId(token: string): number | null {
-  const session = store.get(token);
-  if (!session) return null;
-
-  if (session.expiresAt <= sekarang()) {
-    // Sekalian dibuang supaya tidak menumpuk.
-    store.delete(token);
-    return null;
-  }
-
-  return session.userId;
+  return sessions.userId(token);
 }
 
 export function revokeSession(token: string): boolean {
-  return store.delete(token);
+  return sessions.revoke(token);
 }
 
 /** Cabut seluruh sesi satu pengguna — dipakai saat ganti sandi atau ditangguhkan. */
 export function revokeAllForUser(userId: number): number {
-  let jumlah = 0;
-  for (const [token, s] of store) {
-    if (s.userId === userId) {
-      store.delete(token);
-      jumlah++;
-    }
-  }
-  return jumlah;
+  return sessions.revokeAllForUser(userId);
 }
 
 /** Buang sesi kedaluwarsa. Dipanggil penjadwal, atau saat pengujian. */
 export function purgeExpired(): number {
-  const batas = sekarang();
-  let jumlah = 0;
-  for (const [token, s] of store) {
-    if (s.expiresAt <= batas) {
-      store.delete(token);
-      jumlah++;
-    }
-  }
-  return jumlah;
+  return sessions.purgeExpired();
 }
 
 /** Hanya untuk pengujian: kosongkan seluruh sesi. */
 export function clearSessions(): void {
-  store.clear();
+  sessions.clear();
 }

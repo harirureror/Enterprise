@@ -6,6 +6,23 @@ import assert from "node:assert/strict";
 import {
   addProgress,
   createProject,
+  deleteAgendaEntries,
+  moveAgendaEntries,
+  createPlan,
+  createPlanComment,
+  createPlanProspect,
+  createPlanStep,
+  deletePlan,
+  getCoverage,
+  getPlan,
+  getPlanDetail,
+  getPlanProspects,
+  getPlanSteps,
+  getPlans,
+  setPlanProjects,
+  setPlanStepStatus,
+  updatePlan,
+  updatePlanProspect,
   deleteProject,
   getCurrentUser,
   getFilterOptions,
@@ -38,15 +55,24 @@ import {
   updateUser,
 } from "./api";
 import { SEMUA } from "./filters";
+import { openDb, pakaiDb } from "./db/index";
+import { runMigrations } from "./db/migrate";
+import { seed } from "./db/seed";
+import * as store from "./db/store";
 import { hashPassword } from "./password";
 import { verifyCredentials } from "./auth";
-import {
-  progressHistory as mockProgress,
-  projectDependencies as mockDependencies,
-  projects as mockProjects,
-} from "./mock-data";
 import { scoreAll } from "./priority";
 import { PROJECT_TYPES, isActiveStatus } from "./types";
+
+/* Database sendiri di memori, diisi dari mock-data.
+
+   Wajib: sejak lib/api.ts menulis ke SQLite, cek ini akan menyunting dan
+   menghapus data kerja yang sesungguhnya kalau dibiarkan memakai
+   data/dashboard.db. */
+const dbUji = openDb(":memory:");
+runMigrations(dbUji);
+seed(dbUji, { force: true });
+pakaiDb(dbUji);
 
 // Dibungkus fungsi karena tsx mengompilasi berkas ini ke CJS — tidak ada top-level await.
 async function main() {
@@ -143,7 +169,7 @@ async function main() {
      seluruh blok dilewati kalau riwayatnya memang kosong — mock-data adalah
      data kerja yang boleh saja belum punya catatan progres sama sekali.
      Yang diuji di sini kontrak fungsinya, bukan isi datanya. */
-  const idRiwayat = mockProgress[0]?.projectId;
+  const idRiwayat = store.progress.all()[0]?.projectId;
   if (idRiwayat !== undefined) {
     const riwayat = await getProgressHistory(idRiwayat);
     assert.ok(riwayat.length > 0);
@@ -202,9 +228,9 @@ async function main() {
   // Prioritas otomatis: proyek "auto" ikut hasil hitungan, "manual" tidak ditimpa.
   // Ketergantungan ikut disertakan: gerbangnya menghitung dengan konteks yang
   // sama, jadi menghilangkannya di sini akan membandingkan dua model berbeda.
-  const skor = scoreAll(mockProjects, mockDependencies);
+  const skor = scoreAll(store.projects.all(), store.dependencies.all());
   for (const p of semua) {
-    const tersimpan = mockProjects.find((m) => m.id === p.id)!;
+    const tersimpan = store.projects.byId(p.id)!;
     if (p.priorityMode === "auto") {
       assert.equal(p.priority, skor.get(p.id)!.level, `proyek ${p.id} harus ikut skor`);
     } else {
@@ -215,16 +241,23 @@ async function main() {
      data kerja boleh saja seluruhnya otomatis, dan cabang ini tetap harus
      teruji. Nilai aslinya dikembalikan supaya assertion berikutnya tidak
      mewarisi keadaan yang sudah diubah. */
-  const dikunci = mockProjects[0];
+  const dikunci = store.projects.all()[0];
   const modeAsli = dikunci.priorityMode;
   const prioritasAsli = dikunci.priority;
 
-  dikunci.priorityMode = "manual";
+  const setMode = (mode: string, prioritas: string) =>
+    store.projects.patch(
+      dikunci.id,
+      { priority_mode: mode, priority: prioritas },
+      dikunci.updatedAt
+    );
+
+  setMode("manual", dikunci.priority);
   // Dikunci ke level yang berbeda dari hasil hitungan, supaya "tidak ditimpa"
   // benar-benar terlihat bedanya.
   const hitung = skor.get(dikunci.id)!.level;
-  dikunci.priority = hitung === "Tinggi" ? "Rendah" : "Tinggi";
-  const terkunci = dikunci.priority;
+  const terkunci = hitung === "Tinggi" ? "Rendah" : "Tinggi";
+  setMode("manual", terkunci);
 
   assert.equal((await getProject(dikunci.id))!.priority, terkunci);
   assert.notEqual(terkunci, hitung, "penguncian harus diuji pada level yang berbeda");
@@ -235,11 +268,10 @@ async function main() {
   );
 
   // Kembali ke otomatis: sekarang justru harus ikut hasil hitungan.
-  dikunci.priorityMode = "auto";
+  setMode("auto", terkunci);
   assert.equal((await getProject(dikunci.id))!.priority, hitung);
 
-  dikunci.priorityMode = modeAsli;
-  dikunci.priority = prioritasAsli;
+  setMode(modeAsli, prioritasAsli);
 
   // Fokus diurutkan dari skor tertinggi dan tidak memuat proyek selesai.
   const fokus = await getFocusProjects(5);
@@ -344,9 +376,11 @@ async function main() {
 
   /* --- Ketergantungan antar proyek ---------------------------------------- */
 
-  const relasiSemula = mockDependencies.map((d) => ({ ...d }));
-  // Mulai dari nol supaya yang diuji perilaku gerbangnya, bukan isi mock-data.
-  mockDependencies.length = 0;
+  const relasiSemula = store.dependencies.all();
+  // Mulai dari nol supaya yang diuji perilaku gerbangnya, bukan isi data awal.
+  for (const id of new Set(relasiSemula.map((d) => d.blockerId))) {
+    store.dependencies.replaceFor(id, []);
+  }
   const [a, b, c] = (await getProjects()).map((p) => p.id);
 
   // Menetapkan daftar mengganti relasi lama, bukan menumpuknya.
@@ -392,8 +426,12 @@ async function main() {
   assert.ok(detailRelasi.dependencyCandidates.every((p) => p.id !== a));
 
   // Kembalikan relasi awal supaya urutan pemeriksaan tidak saling mengotori.
-  mockDependencies.length = 0;
-  mockDependencies.push(...relasiSemula);
+  for (const id of new Set(relasiSemula.map((d) => d.blockerId))) {
+    store.dependencies.replaceFor(
+      id,
+      relasiSemula.filter((d) => d.blockerId === id).map((d) => d.blockedId)
+    );
+  }
 
   /* --- Kelola pengguna ------------------------------------------------------ */
 
@@ -524,6 +562,254 @@ async function main() {
   assert.equal(await deleteAgenda(agendaUji.id), false); // klik ganda tidak melapor sukses palsu
   assert.equal(await getAgendaEntry(agendaUji.id), null);
   assert.equal((await getAgenda()).length, agendaSemula);
+
+  /* --- Pindah dan hapus massal (papan seret-lepas) --------------------------- */
+
+  const bikinAgenda = (startDate: string, endDate: string) =>
+    createAgenda({
+      userId: baru.id,
+      projectId: proyekAgenda.id,
+      kind: "Lapangan",
+      startDate,
+      endDate,
+      locationCity: "Muara Enim",
+      locationProvince: "Sumatera Selatan",
+      note: "",
+      createdBy: akunAdmin.id,
+      updatedAt: "2026-09-01",
+    });
+
+  // Tiga entri berdampingan — di layar inilah yang menyatu jadi satu bar.
+  const s1 = await bikinAgenda("2026-09-01", "2026-09-02");
+  const s2 = await bikinAgenda("2026-09-03", "2026-09-03");
+  const s3 = await bikinAgenda("2026-09-04", "2026-09-05");
+  const trio = [s1.id, s2.id, s3.id];
+
+  // Menggeser bar menggerakkan seluruh isinya sejauh hari yang sama, dan lama
+  // tiap entri tidak berubah.
+  const geser = await moveAgendaEntries(
+    trio.map((id, i) => ({
+      id,
+      userId: baru.id,
+      startDate: [`2026-09-03`, `2026-09-05`, `2026-09-06`][i],
+      endDate: [`2026-09-04`, `2026-09-05`, `2026-09-07`][i],
+    }))
+  );
+  assert.equal(geser.ok, true);
+  assert.equal((await getAgendaEntry(s1.id))!.startDate, "2026-09-03");
+  assert.equal((await getAgendaEntry(s1.id))!.endDate, "2026-09-04");
+  assert.equal((await getAgendaEntry(s3.id))!.startDate, "2026-09-06");
+
+  // Pemilik ikut berpindah kalau diminta.
+  assert.equal(
+    (
+      await moveAgendaEntries([
+        { id: s2.id, userId: akunAdmin.id, startDate: "2026-09-05", endDate: "2026-09-05" },
+      ])
+    ).ok,
+    true
+  );
+  assert.equal((await getAgendaEntry(s2.id))!.userId, akunAdmin.id);
+  // Dikembalikan supaya sisa cek tetap berpijak pada keadaan yang sama.
+  await moveAgendaEntries([
+    { id: s2.id, userId: baru.id, startDate: "2026-09-05", endDate: "2026-09-05" },
+  ]);
+
+  // Satu id tidak dikenal membatalkan SELURUH pemindahan — bukan memindahkan
+  // sebagian lalu melapor gagal, yang akan meninggalkan bar terbelah dua tanggal.
+  const sebelumGagal = (await getAgendaEntry(s1.id))!.startDate;
+  const gagalGeser = await moveAgendaEntries([
+    { id: s1.id, userId: baru.id, startDate: "2026-10-01", endDate: "2026-10-02" },
+    { id: 999_999, userId: baru.id, startDate: "2026-10-01", endDate: "2026-10-02" },
+  ]);
+  assert.equal(gagalGeser.ok, false);
+  assert.equal((await getAgendaEntry(s1.id))!.startDate, sebelumGagal, "atomik: tidak ada yang bergeser");
+
+  // Daftar kosong bukan kesalahan, tapi juga tidak mengubah apa pun.
+  assert.deepEqual(await moveAgendaEntries([]), { ok: true, jumlah: 0 });
+
+  // Hapus massal: satu id tidak dikenal membatalkan seluruh batch.
+  const sebelumHapus = (await getAgenda()).length;
+  const gagalHapus = await deleteAgendaEntries([s1.id, 999_999]);
+  assert.equal(gagalHapus.ok, false);
+  assert.equal((await getAgenda()).length, sebelumHapus, "atomik: tidak ada yang terhapus");
+  assert.ok(await getAgendaEntry(s1.id));
+
+  // Yang sah menghapus semuanya sekaligus.
+  const hapusTrio = await deleteAgendaEntries(trio);
+  assert.deepEqual(hapusTrio, { ok: true, jumlah: 3 });
+  assert.equal((await getAgenda()).length, sebelumHapus - 3);
+  for (const id of trio) assert.equal(await getAgendaEntry(id), null);
+
+  assert.deepEqual(await deleteAgendaEntries([]), { ok: true, jumlah: 0 });
+
+  /* --- Rencana strategis ----------------------------------------------------- */
+
+  const rencanaSemula = (await getPlans()).length;
+  assert.ok(rencanaSemula > 0, "data awal harus memuat rencana contoh");
+
+  // Bikin rencana baru; progres rencana tanpa langkah adalah 0, bukan NaN.
+  const rencanaUji = await createPlan({
+    title: "Uji rencana API",
+    summary: "",
+    kind: "Kemitraan",
+    goal: "Kapasitas Internal",
+    segment: "Energi",
+    region: "Riau",
+    partner: "Mitra Uji",
+    status: "Ide",
+    priority: "Sedang",
+    ownerId: users[0].id,
+    startDate: null,
+    targetDate: null,
+    outcome: "",
+    createdBy: users[0].id,
+    updatedAt: "2026-09-01",
+  });
+  assert.equal((await getPlans()).length, rencanaSemula + 1);
+
+  const kosong = (await getPlans()).find((p) => p.id === rencanaUji.id)!;
+  assert.equal(kosong.progress.total, 0);
+  assert.equal(kosong.progress.pct, 0);
+  assert.equal(kosong.owner!.id, users[0].id, "PIC dilengkapi jadi objek, bukan id saja");
+
+  // Saringan diteruskan ke daftar.
+  assert.ok((await getPlans({ goal: "Kapasitas Internal" })).every((p) => p.goal === "Kapasitas Internal"));
+  assert.equal((await getPlans({ segment: "Energi" })).some((p) => p.id === rencanaUji.id), true);
+  assert.equal((await getPlans({ segment: "Perkebunan" })).some((p) => p.id === rencanaUji.id), false);
+
+  // Langkah: nomor urut ditentukan server, bukan dikirim klien.
+  const langkah1 = (await createPlanStep(rencanaUji.id, {
+    title: "Langkah pertama",
+    ownerId: users[0].id,
+    targetDate: "2026-10-01",
+    status: "Belum",
+    note: "",
+  }))!;
+  const langkah2 = (await createPlanStep(rencanaUji.id, {
+    title: "Langkah kedua",
+    ownerId: null,
+    targetDate: null,
+    status: "Belum",
+    note: "",
+  }))!;
+  assert.equal(langkah1.sortOrder, 0);
+  assert.equal(langkah2.sortOrder, 1, "nomor urut menaik walau tanggalnya kosong");
+  assert.equal(await createPlanStep(999_999, {
+    title: "Rencana hantu",
+    ownerId: null,
+    targetDate: null,
+    status: "Belum",
+    note: "",
+  }), null, "langkah tanpa rencana induk ditolak");
+
+  // Progres benar-benar diturunkan dari langkah — tidak ada angka yang disimpan.
+  await setPlanStepStatus(langkah1.id, "Selesai");
+  const separuh = (await getPlans()).find((p) => p.id === rencanaUji.id)!;
+  assert.equal(separuh.progress.total, 2);
+  assert.equal(separuh.progress.selesai, 1);
+  assert.equal(separuh.progress.pct, 50);
+
+  // Langkah yang dibatalkan hilang dari penyebut, bukan dihitung gagal.
+  await setPlanStepStatus(langkah2.id, "Batal");
+  const tanpaBatal = (await getPlans()).find((p) => p.id === rencanaUji.id)!;
+  assert.equal(tanpaBatal.progress.total, 1);
+  assert.equal(tanpaBatal.progress.pct, 100);
+
+  // Prospek ikut terhitung di ringkasan rencana.
+  const prospekUji = (await createPlanProspect({
+    planId: rencanaUji.id,
+    name: "PT Uji Prospek",
+    contact: "",
+    region: "Riau",
+    status: "Dihubungi",
+    note: "",
+    updatedAt: "2026-09-01",
+  }))!;
+  assert.equal(
+    await createPlanProspect({
+      planId: 999_999,
+      name: "Tanpa induk",
+      contact: "",
+      region: "",
+      status: "Dihubungi",
+      note: "",
+      updatedAt: "2026-09-01",
+    }),
+    null
+  );
+
+  const denganProspek = (await getPlans()).find((p) => p.id === rencanaUji.id)!;
+  assert.equal(denganProspek.prospekTotal, 1);
+  assert.equal(denganProspek.prospekMenang, 0);
+
+  await updatePlanProspect(prospekUji.id, {
+    ...prospekUji,
+    status: "Menjadi Klien",
+  });
+  assert.equal(
+    (await getPlans()).find((p) => p.id === rencanaUji.id)!.prospekMenang,
+    1,
+    "prospek yang jadi klien ikut terhitung"
+  );
+
+  // setPlanProjects MENGGANTI daftar, bukan menumpuk.
+  const duaProyek = semua.slice(0, 2).map((p) => p.id);
+  assert.deepEqual(await setPlanProjects(rencanaUji.id, duaProyek), { ok: true });
+  assert.equal((await getPlanDetail(rencanaUji.id))!.projects.length, 2);
+
+  assert.deepEqual(await setPlanProjects(rencanaUji.id, [duaProyek[0]]), { ok: true });
+  const detailRencana = (await getPlanDetail(rencanaUji.id))!;
+  assert.equal(detailRencana.projects.length, 1, "daftar diganti, bukan ditambahkan");
+  assert.equal(detailRencana.projects[0].id, duaProyek[0]);
+
+  // Proyek yang tidak ada ditolak, dan kaitan lama tidak ikut hilang karenanya.
+  const tolakan = await setPlanProjects(rencanaUji.id, [999_999]);
+  assert.equal(tolakan.ok, false);
+  assert.equal((await getPlanDetail(rencanaUji.id))!.projects.length, 1);
+  assert.equal((await setPlanProjects(999_999, [])).ok, false);
+
+  // getPlanDetail melengkapi: nama PIC langkah, dan langkah tanpa PIC tetap null.
+  assert.equal(detailRencana.steps.find((s) => s.id === langkah1.id)!.owner!.id, users[0].id);
+  assert.equal(detailRencana.steps.find((s) => s.id === langkah2.id)!.owner, null);
+  assert.equal(await getPlanDetail(999_999), null);
+
+  // Komentar rencana: tabelnya sendiri, dan menolak rencana yang tidak ada.
+  assert.ok(
+    await createPlanComment({ planId: rencanaUji.id, userId: users[0].id, body: "Catatan uji" })
+  );
+  assert.equal(
+    await createPlanComment({ planId: 999_999, userId: users[0].id, body: "Ke mana ini" }),
+    null
+  );
+  assert.equal((await getPlanDetail(rencanaUji.id))!.comments.length, 1);
+
+  // Jangkauan: wilayah yang punya rencana tapi belum ada proyeknya muncul
+  // sebagai wilayah yang sedang dituju.
+  const jangkauan = await getCoverage();
+  const riau = jangkauan.find((c) => c.region.toLowerCase() === "riau");
+  assert.ok(riau, "wilayah sasaran baru harus muncul di ringkasan jangkauan");
+  assert.equal(riau!.projects, 0);
+  assert.ok(riau!.plans >= 1);
+
+  // Perbarui; createdBy tidak ikut diubah karena bukan bagian input.
+  const rencanaDiubah = await updatePlan(rencanaUji.id, {
+    ...rencanaUji,
+    title: "Uji rencana API (diubah)",
+    status: "Berjalan",
+  });
+  assert.equal(rencanaDiubah!.title, "Uji rencana API (diubah)");
+  assert.equal(rencanaDiubah!.createdBy, users[0].id);
+  assert.equal(await updatePlan(999_999, { ...rencanaUji }), null);
+
+  // Hapus: isinya ikut lenyap lewat CASCADE, proyeknya tidak.
+  assert.equal(await deletePlan(rencanaUji.id), true);
+  assert.equal(await deletePlan(rencanaUji.id), false); // klik ganda tidak melapor sukses palsu
+  assert.equal(await getPlan(rencanaUji.id), null);
+  assert.equal((await getPlanSteps(rencanaUji.id)).length, 0);
+  assert.equal((await getPlanProspects(rencanaUji.id)).length, 0);
+  assert.equal((await getPlans()).length, rencanaSemula);
+  assert.equal((await getProjects()).length, semua.length, "proyeknya tidak ikut terhapus");
 
   console.log("ok: api");
 }

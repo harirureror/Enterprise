@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Badge from "@/components/Badge";
 import ExportMenu from "@/components/ExportMenu";
 import { SEMUA, type Semua, filterProjects } from "@/lib/filters";
-import { getUser } from "@/lib/mock-data";
+
 import { barPosition, monthTicks, overlapInfo, overlapPerMonth, timelineRange } from "@/lib/timeline";
 import {
   PROJECT_PRIORITIES,
@@ -12,6 +12,7 @@ import {
   PROJECT_TYPES,
   type Project,
   type ProjectPriority,
+  type User,
   type ProjectStatus,
   type ProjectType,
 } from "@/lib/types";
@@ -30,7 +31,15 @@ const selectClass =
 // Di layar sempit filter ditumpuk vertikal biar label tidak terpotong.
 const labelClass = "flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2";
 
-export default function TimelineChart({ projects }: { projects: Project[] }) {
+export default function TimelineChart({
+  projects,
+  users,
+}: {
+  projects: Project[];
+  /** Anggota, diturunkan server — komponen klien tidak membaca data sendiri. */
+  users: User[];
+}) {
+  const namaPIC = (id: number) => users.find((u) => u.id === id)?.name ?? `Anggota ${id}`;
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [status, setStatus] = useState<ProjectStatus | Semua>(SEMUA);
   const [priority, setPriority] = useState<ProjectPriority | Semua>(SEMUA);
@@ -41,9 +50,9 @@ export default function TimelineChart({ projects }: { projects: Project[] }) {
   const owners = useMemo(() => {
     const ids = [...new Set(projects.map((p) => p.ownerId))];
     return ids
-      .map((id) => ({ id, name: getUser(id)?.name ?? `Anggota ${id}` }))
+      .map((id) => ({ id, name: users.find((u) => u.id === id)?.name ?? `Anggota ${id}` }))
       .sort((a, b) => a.name.localeCompare(b.name, "id"));
-  }, [projects]);
+  }, [projects, users]);
 
   // Predikatnya sama persis dengan GET /api/projects, jadi hasilnya tidak bisa beda.
   const filtered = useMemo(
@@ -237,7 +246,7 @@ export default function TimelineChart({ projects }: { projects: Project[] }) {
           <ul className="mt-3 space-y-2">
             {rows.map((p) => {
               const { leftPct, widthPct } = barPosition(p, range);
-              const owner = getUser(p.ownerId);
+              const owner = users.find((u) => u.id === p.ownerId) ?? null;
               const isSelected = p.id === selectedId;
               const bentrok = counts.get(p.id) ?? 0;
               const rentang = `${formatDate(p.startDate)} sampai ${formatDate(p.deadline)}`;
@@ -331,7 +340,7 @@ export default function TimelineChart({ projects }: { projects: Project[] }) {
               </div>
               <div>
                 <dt className="text-muted">PIC</dt>
-                <dd className="font-medium">{getUser(selected.ownerId)?.name ?? "—"}</dd>
+                <dd className="font-medium">{namaPIC(selected.ownerId)}</dd>
               </div>
               <div>
                 <dt className="text-muted">Progres</dt>

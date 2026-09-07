@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getUsers } from "./api";
 import { type Ability, can, landingPath } from "./permissions";
-import { credentials as mockCredentials } from "./mock-data";
+import { users as storeUsers } from "./db/store";
 import { verifyPassword } from "./password";
 import { getSessionUserId } from "./session";
 import type { User } from "./types";
@@ -122,31 +122,32 @@ export async function tolakKalauTakBoleh(ability: Ability): Promise<Ditolak | nu
  * tanpa membedakan "email tidak ada" dari "sandi salah", supaya pemanggil tidak
  * bisa dipakai menebak siapa yang punya akun.
  *
- * Dua jalur, keduanya hanya di luar produksi:
- *   1. Kredensial per akun dengan hash scrypt (akun uji).
- *   2. DEV_LOGIN_PASSWORD — satu sandi untuk semua akun seed, untuk menelusuri
- *      aplikasi sebagai anggota mana pun tanpa membuat sandi satu per satu.
+ * Hash sandi dibaca dari kolom users.password_hash, jadi sandi yang disetel
+ * admin lewat halaman Kelola Pengguna langsung berlaku — dan tetap berlaku
+ * setelah server dimulai ulang.
  *
- * ponytail: begitu pendaftaran ada, kredensial nyata (devOnly: false) berlaku
- * di semua lingkungan dan jalur kedua dihapus.
+ * DEV_LOGIN_PASSWORD masih ada sebagai jalan pintas pengembangan untuk akun
+ * yang belum punya sandi, dan hanya di luar produksi. Karena `next start`
+ * selalu produksi, jalur itu praktis mati saat aplikasi dipakai sungguhan.
  */
 export async function verifyCredentials(
   email: string,
   password: string
 ): Promise<User | null> {
   const produksi = process.env.NODE_ENV === "production";
-  const alamat = email.trim().toLowerCase();
-  const ditemukan = (await getUsers()).find((u) => u.email.toLowerCase() === alamat || u.name.toLowerCase() === alamat);
+  // Boleh masuk dengan email atau nama — keduanya dicocokkan tanpa memandang
+  // kapitalisasi.
+  const ditemukan = storeUsers.byIdentity(email);
   // Akun nonaktif diperlakukan persis seperti akun yang tidak ada — termasuk
   // sandinya tetap diperiksa — supaya tidak bocor akun mana yang dinonaktifkan.
-  const user = ditemukan?.isActive ? ditemukan : undefined;
+  const user = ditemukan?.isActive ? ditemukan : null;
 
   // Sandi tetap diperiksa walau penggunanya tidak ada, supaya lama proses tidak
-  // membocorkan email mana yang terdaftar.
-  const kredensial = user ? mockCredentials.find((c) => c.userId === user.id) : undefined;
+  // membocorkan identitas mana yang terdaftar.
+  const hash = user ? storeUsers.passwordHash(user.id) : null;
 
-  if (kredensial && !(kredensial.devOnly && produksi)) {
-    return verifyPassword(password, kredensial.passwordHash) && user ? user : null;
+  if (hash) {
+    return verifyPassword(password, hash) && user ? user : null;
   }
 
   const devPassword = process.env.DEV_LOGIN_PASSWORD;

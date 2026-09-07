@@ -106,6 +106,99 @@ export const ACCESS_LEVELS: AccessLevel[] = ["Admin", "Owner", "HR", "Manager", 
 export type AgendaKind = "Lapangan" | "Kantor" | "Perjalanan" | "Cuti";
 export const AGENDA_KINDS: AgendaKind[] = ["Lapangan", "Kantor", "Perjalanan", "Cuti"];
 
+/* --- Rencana strategis ------------------------------------------------------
+
+   Dua sumbu yang sengaja dipisah: `kind` menjawab "apa kegiatannya", `goal`
+   menjawab "untuk apa". Pelatihan bisa mengarah ke penetrasi pasar maupun ke
+   kapasitas internal — kalau keduanya jadi satu daftar, pertanyaan "rencana apa
+   saja yang mengarah ke penetrasi pasar" tidak bisa dijawab. */
+
+export type PlanKind = "Pelatihan" | "Riset" | "Kemitraan" | "Sertifikasi" | "Pemasaran";
+export const PLAN_KINDS: PlanKind[] = [
+  "Pelatihan",
+  "Riset",
+  "Kemitraan",
+  "Sertifikasi",
+  "Pemasaran",
+];
+
+export type PlanGoal =
+  | "Penetrasi Pasar"
+  | "Kesiapan Regulasi"
+  | "Kapasitas Internal"
+  | "Efisiensi Biaya";
+export const PLAN_GOALS: PlanGoal[] = [
+  "Penetrasi Pasar",
+  "Kesiapan Regulasi",
+  "Kapasitas Internal",
+  "Efisiensi Biaya",
+];
+
+/** Segmen pasar yang disasar. Tertutup supaya bisa disaring dan dijumlah. */
+export type PlanSegment =
+  | "Tambang"
+  | "Perkebunan"
+  | "Kehutanan"
+  | "Infrastruktur"
+  | "Energi"
+  | "Instansi Pemerintah"
+  | "Akademik"
+  | "Lainnya";
+export const PLAN_SEGMENTS: PlanSegment[] = [
+  "Tambang",
+  "Perkebunan",
+  "Kehutanan",
+  "Infrastruktur",
+  "Energi",
+  "Instansi Pemerintah",
+  "Akademik",
+  "Lainnya",
+];
+
+export type PlanStatus =
+  | "Ide"
+  | "Disetujui"
+  | "Berjalan"
+  | "Selesai"
+  | "Ditunda"
+  | "Dibatalkan";
+export const PLAN_STATUSES: PlanStatus[] = [
+  "Ide",
+  "Disetujui",
+  "Berjalan",
+  "Selesai",
+  "Ditunda",
+  "Dibatalkan",
+];
+
+/** Rencana yang tidak perlu dikejar lagi. */
+export const PLAN_DONE_STATUSES: PlanStatus[] = ["Selesai", "Dibatalkan"];
+
+export function isActivePlan(status: PlanStatus): boolean {
+  return !PLAN_DONE_STATUSES.includes(status);
+}
+
+export type StepStatus = "Belum" | "Berjalan" | "Selesai" | "Batal";
+export const STEP_STATUSES: StepStatus[] = ["Belum", "Berjalan", "Selesai", "Batal"];
+
+/** Corong pendekatan calon klien. Terpisah dari pipeline proyek: yang di sini
+    belum tentu pernah jadi proyek. */
+export type ProspectStatus =
+  | "Belum dihubungi"
+  | "Dihubungi"
+  | "Presentasi"
+  | "Negosiasi"
+  | "Menjadi Klien"
+  | "Tidak Lanjut";
+export const PROSPECT_STATUSES: ProspectStatus[] = [
+  "Belum dihubungi",
+  "Dihubungi",
+  "Presentasi",
+  "Negosiasi",
+  "Menjadi Klien",
+  "Tidak Lanjut",
+];
+
 export type User = {
   id: number;
   name: string;
@@ -282,6 +375,86 @@ export type AgendaEntry = {
   /** Siapa yang mencatat; bisa berbeda dari `userId`. */
   createdBy: number;
   updatedAt: string;
+};
+
+/**
+ * Satu rencana strategis: ke mana divisi menuju, dan pasar mana yang didekati.
+ *
+ * Bedanya dengan `Project`: tidak ada klien yang membayar dan tidak ada nilai
+ * kontrak. Keberhasilannya diukur lewat `outcome` dan kemajuan langkah-
+ * langkahnya, bukan lewat rupiah.
+ */
+export type StrategicPlan = {
+  id: number;
+  title: string;
+  /** Latar belakang dan uraian rencana. */
+  summary: string;
+  kind: PlanKind;
+  goal: PlanGoal;
+  segment: PlanSegment;
+  /** Provinsi sasaran; sebangun dengan `Project.locationProvince`. */
+  region: string;
+  /** Lawan bicara: Inspektur Tambang, Undip, ITERA. */
+  partner: string;
+  status: PlanStatus;
+  priority: ProjectPriority;
+  ownerId: number;
+  /** ISO date; `null` karena sebuah ide belum tentu sudah punya tanggal. */
+  startDate: string | null;
+  targetDate: string | null;
+  /** Ukuran keberhasilan, ditulis di depan supaya tidak dikarang di belakang. */
+  outcome: string;
+  createdBy: number;
+  updatedAt: string;
+};
+
+/**
+ * Satu langkah pelaksanaan. Progres rencana diturunkan dari kumpulan langkah
+ * ini — tidak pernah diketik orang; lihat lib/strategy.ts.
+ */
+export type PlanStep = {
+  id: number;
+  planId: number;
+  title: string;
+  /** `null` kalau langkahnya belum ditugaskan ke siapa pun. */
+  ownerId: number | null;
+  targetDate: string | null;
+  status: StepStatus;
+  note: string;
+  /** Urutan ditentukan orang, bukan tanggal. */
+  sortOrder: number;
+};
+
+/** Calon klien yang akan didekati dalam rangka sebuah rencana. */
+export type PlanProspect = {
+  id: number;
+  planId: number;
+  name: string;
+  contact: string;
+  region: string;
+  status: ProspectStatus;
+  note: string;
+  updatedAt: string;
+};
+
+/**
+ * Kaitan rencana ke proyek yang lahir darinya. Banyak-ke-banyak: satu rencana
+ * bisa melahirkan beberapa proyek, dan satu proyek bisa melayani lebih dari
+ * satu rencana.
+ */
+export type ProjectPlanLink = {
+  planId: number;
+  projectId: number;
+};
+
+/** Komentar pada rencana. Bentuknya sama dengan ProjectComment, tabelnya beda. */
+export type PlanComment = {
+  id: number;
+  planId: number;
+  userId: number;
+  body: string;
+  createdAt: string;
+  postedAt: string;
 };
 
 /**
