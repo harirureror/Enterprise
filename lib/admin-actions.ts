@@ -6,6 +6,7 @@ import {
   emailTerpakai,
   getUsers,
   jumlahAdminAktif,
+  updateUserIdentity,
   setUserAccessLevel,
   setUserActive,
   setUserPassword,
@@ -15,7 +16,15 @@ import { PASSWORD_MIN } from "@/lib/login-form";
 import { hashPassword } from "@/lib/password";
 import { isAccessLevel } from "@/lib/permissions";
 import { revokeAllForUser } from "@/lib/session";
-import { type UserDraft, type UserErrors, draftToUser, validateUser } from "@/lib/user-form";
+import {
+  NAME_MAX,
+  NAME_MIN,
+  type UserDraft,
+  type UserErrors,
+  draftToUser,
+  validateEmail,
+  validateUser,
+} from "@/lib/user-form";
 import type { AccessLevel } from "@/lib/types";
 
 /* Kelola pengguna — satu-satunya kemampuan yang khusus milik Admin.
@@ -75,6 +84,59 @@ export async function tambahPengguna(draft: UserDraft): Promise<AdminHasil> {
  * Mencabut sesi itu inti dari reset: tanpa itu orang yang sandinya diganti
  * tetap bisa memakai aplikasi sampai 12 jam ke depan dengan sesi lamanya.
  */
+/**
+ * Perbaiki nama dan email sebuah akun.
+ *
+ * Ada supaya salah ketik pada identitas bisa dibetulkan tanpa membuat akun
+ * baru — kalau akunnya dibuat ulang, komentar, agenda, dan kepemilikan proyek
+ * tetap menempel di akun lama dan riwayat orang itu terbelah dua.
+ *
+ * Mengubah email MENCABUT seluruh sesi orang itu, sama seperti menyetel ulang
+ * sandi dan mengubah tingkat akses: email adalah identitas login, jadi sesi
+ * yang berjalan atas alamat lama tidak boleh dibiarkan menggantung.
+ */
+export async function ubahIdentitasPengguna(
+  userId: number,
+  nama: string,
+  email: string
+): Promise<AdminHasil> {
+  const ditolak = await tolakKalauTakBoleh("kelola-pengguna");
+  if (ditolak) return ditolak;
+
+  const semua = await getUsers();
+  const target = semua.find((u) => u.id === userId);
+  if (!target) return { ok: false, error: "Akun tidak ditemukan.", errors: {} };
+
+  // Email akun LAIN saja; tanpa pengecualian ini, menyimpan tanpa mengganti
+  // email akan dianggap bentrok dengan dirinya sendiri.
+  const emailLain = semua.filter((u) => u.id !== userId).map((u) => u.email.toLowerCase());
+
+  const errors: UserErrors = {};
+  const namaBersih = nama.trim();
+  if (namaBersih === "") errors.name = "Nama wajib diisi.";
+  else if (namaBersih.length < NAME_MIN) errors.name = `Nama minimal ${NAME_MIN} karakter.`;
+  else if (namaBersih.length > NAME_MAX) errors.name = `Nama maksimal ${NAME_MAX} karakter.`;
+
+  const galatEmail = validateEmail(email, emailLain);
+  if (galatEmail) errors.email = galatEmail;
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, error: "Periksa kembali isian Anda.", errors };
+  }
+
+  const emailBaru = email.trim();
+  const emailBerubah = emailBaru.toLowerCase() !== target.email.toLowerCase();
+
+  const hasil = await updateUserIdentity(userId, { name: namaBersih, email: emailBaru });
+  if (!hasil.ok) return { ok: false, error: hasil.error, errors: {} };
+
+  if (emailBerubah) revokeAllForUser(userId);
+
+  // Nama muncul di topbar, daftar tim, dan riwayat — segarkan semuanya.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function resetSandi(userId: number, sandiBaru: string): Promise<AdminHasil> {
   const ditolak = await tolakKalauTakBoleh("kelola-pengguna");
   if (ditolak) return ditolak;

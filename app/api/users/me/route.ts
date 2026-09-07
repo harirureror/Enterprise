@@ -1,10 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { jagaSesi } from "@/lib/api-guard";
 import { type NextRequest, NextResponse } from "next/server";
-import { getMemberProfile, updateUser } from "@/lib/api";
+import { getMemberProfile, getUsers, updateUserIdentity } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { unauthorized } from "@/lib/auth-response";
 import { validateProfile } from "@/lib/profile-form";
+import { revokeAllForUser } from "@/lib/session";
 
 /**
  * Profil pengguna yang sedang masuk (PRD bagian 7).
@@ -68,10 +69,11 @@ export async function PUT(request: NextRequest) {
 
   const masuk = body as Record<string, unknown>;
 
-  // Email dan peran menentukan hak akses — keduanya urusan admin. Kiriman yang
-  // memuatnya ditolak terang-terangan, bukan diabaikan diam-diam, supaya
-  // pemanggil tidak mengira perubahannya tersimpan.
-  const terlarang = ["email", "role", "id"].filter((k) => masuk[k] !== undefined);
+  // Peran menentukan hak akses — itu urusan admin. Kiriman yang memuatnya
+  // ditolak terang-terangan, bukan diabaikan diam-diam, supaya pemanggil tidak
+  // mengira perubahannya tersimpan. Email TIDAK lagi terlarang: ia identitas
+  // login, tapi memperbaiki salah ketiknya adalah hak pemiliknya sendiri.
+  const terlarang = ["role", "id"].filter((k) => masuk[k] !== undefined);
   if (terlarang.length > 0) {
     return NextResponse.json(
       { error: `Kolom ini tidak bisa diubah sendiri: ${terlarang.join(", ")}.` },
@@ -83,21 +85,40 @@ export async function PUT(request: NextRequest) {
     name: masuk.name === undefined || masuk.name === null ? "" : String(masuk.name),
     avatarUrl:
       masuk.avatarUrl === undefined || masuk.avatarUrl === null ? "" : String(masuk.avatarUrl),
+    // Tidak dikirim berarti tidak diubah, bukan dikosongkan.
+    email: masuk.email === undefined || masuk.email === null ? sesi.user.email : String(masuk.email),
   };
 
-  const errors = validateProfile(draft);
+  const emailLain = (await getUsers())
+    .filter((u) => u.id !== sesi.user.id)
+    .map((u) => u.email.toLowerCase());
+
+  const errors = validateProfile(draft, emailLain);
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ error: "Data profil belum valid.", errors }, { status: 400 });
   }
 
   const avatar = draft.avatarUrl.trim();
-  const user = await updateUser(sesi.user.id, {
+  const emailBaru = draft.email.trim();
+  const emailBerubah = emailBaru.toLowerCase() !== sesi.user.email.toLowerCase();
+
+  const hasil = await updateUserIdentity(sesi.user.id, {
     name: draft.name.trim(),
+    email: emailBaru,
     // Kosong berarti kembali ke inisial, bukan menyimpan string kosong.
     avatarUrl: avatar === "" ? null : avatar,
   });
 
-  if (!user) return NextResponse.json({ error: "Akun tidak ditemukan." }, { status: 404 });
+  if (!hasil.ok) {
+    // Email bentrok itu konflik keadaan, bukan kesalahan bentuk kiriman.
+    const status = hasil.error.includes("dipakai") ? 409 : 404;
+    return NextResponse.json({ error: hasil.error }, { status });
+  }
+  const user = hasil.user;
+
+  // Sama seperti jalur server action: mengganti identitas login mencabut
+  // seluruh sesi, termasuk yang sedang memanggil endpoint ini.
+  if (emailBerubah) revokeAllForUser(sesi.user.id);
 
   // Nama dan foto muncul di topbar, daftar tim, dan diskusi. Server action
   // sudah menyegarkan halaman; endpoint ini harus melakukan hal yang sama,

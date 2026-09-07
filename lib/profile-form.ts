@@ -1,9 +1,13 @@
+import { validateEmail } from "./user-form";
+
 /* Validasi form profil. Fungsi murni, dipakai form di browser dan server action. */
 
 export type ProfileDraft = {
   name: string;
   /** URL gambar. Kosong berarti pakai inisial. */
   avatarUrl: string;
+  /** Sekaligus identitas login, jadi keunikannya dijaga sama ketatnya. */
+  email: string;
 };
 
 export type ProfileField = keyof ProfileDraft;
@@ -17,8 +21,13 @@ export const NAME_MAX = 80;
  * (PRD bagian 5) belum ada, dan menyediakan tombol unggah yang tidak
  * menyimpan apa pun lebih buruk daripada meminta tautan.
  */
-export function validateProfile(draft: ProfileDraft): ProfileErrors {
+export function validateProfile(draft: ProfileDraft, emailLain: string[] = []): ProfileErrors {
   const errors: ProfileErrors = {};
+
+  // Aturan email dipinjam dari user-form supaya jalur swalayan dan jalur admin
+  // tidak pernah menerima alamat yang ditolak satunya.
+  const galatEmail = validateEmail(draft.email, emailLain);
+  if (galatEmail) errors.email = galatEmail;
 
   const name = draft.name.trim();
   if (name === "") errors.name = "Nama wajib diisi.";

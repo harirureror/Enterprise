@@ -857,8 +857,29 @@ export async function updateUser(
   id: number,
   input: { name: string; avatarUrl: string | null }
 ): Promise<User | null> {
-  // Email dan peran sengaja tidak ikut: keduanya urusan admin, bukan swalayan.
+  // Peran sengaja tidak ikut: itu urusan admin, bukan swalayan.
   return store.users.updateProfile(id, input.name, input.avatarUrl);
+}
+
+/**
+ * Perbaiki nama dan email sebuah akun.
+ *
+ * Email adalah identitas login, jadi keunikannya diperiksa DI SINI, bukan
+ * hanya di formulir: dua akun dengan email sama membuat byIdentity() memilih
+ * salah satunya secara sewenang-wenang saat login.
+ */
+export async function updateUserIdentity(
+  id: number,
+  input: { name: string; email: string; avatarUrl?: string | null }
+): Promise<{ ok: true; user: User } | { ok: false; error: string }> {
+  const email = input.email.trim();
+
+  if (await emailTerpakai(email, id)) {
+    return { ok: false, error: "Email sudah dipakai akun lain." };
+  }
+
+  const user = store.users.updateIdentity(id, { ...input, email });
+  return user === null ? { ok: false, error: "Akun tidak ditemukan." } : { ok: true, user };
 }
 
 export type NotificationFeed = {

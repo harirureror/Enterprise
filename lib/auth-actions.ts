@@ -1,9 +1,9 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { updateUser } from "@/lib/api";
+import { getUsers, updateUserIdentity } from "@/lib/api";
 import { SESSION_COOKIE, getSessionUser, verifyCredentials } from "@/lib/auth";
-import { SESSION_TTL_HOURS, createSession, revokeSession } from "@/lib/session";
+import { SESSION_TTL_HOURS, createSession, revokeAllForUser, revokeSession } from "@/lib/session";
 import {
   type ProfileDraft,
   type ProfileErrors,
@@ -63,27 +63,50 @@ export async function keluar(): Promise<void> {
 
 export type ProfilHasil = { ok: true } | { ok: false; error: string; errors: ProfileErrors };
 
-/** Perbarui profil pengguna yang sedang masuk. */
+/**
+ * Perbarui profil pengguna yang sedang masuk.
+ *
+ * Email ikut bisa diubah di sini — untuk memperbaiki salah ketik pada alamat
+ * sendiri. Karena email adalah identitas login, mengubahnya MENCABUT seluruh
+ * sesi orang itu: kalau alamatnya diganti justru karena akunnya disalahgunakan,
+ * sesi penyusup tidak boleh ikut bertahan.
+ */
 export async function perbaruiProfil(draft: ProfileDraft): Promise<ProfilHasil> {
   const pengguna = await getSessionUser();
   if (!pengguna) {
     return { ok: false, error: "Perlu masuk untuk mengubah profil.", errors: {} };
   }
 
-  const errors = validateProfile(draft);
+  // Email akun lain saja; tanpa pengecualian ini, menyimpan tanpa mengganti
+  // email akan dianggap bentrok dengan dirinya sendiri.
+  const emailLain = (await getUsers())
+    .filter((u) => u.id !== pengguna.id)
+    .map((u) => u.email.toLowerCase());
+
+  const errors = validateProfile(draft, emailLain);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Periksa kembali isian Anda.", errors };
   }
 
   const avatar = draft.avatarUrl.trim();
-  const hasil = await updateUser(pengguna.id, {
+  const emailBaru = draft.email.trim();
+  const emailBerubah = emailBaru.toLowerCase() !== pengguna.email.toLowerCase();
+
+  const hasil = await updateUserIdentity(pengguna.id, {
     name: draft.name.trim(),
+    email: emailBaru,
     // Kosong berarti kembali ke inisial, bukan menyimpan string kosong.
     avatarUrl: avatar === "" ? null : avatar,
   });
 
-  if (hasil === null) {
-    return { ok: false, error: "Akun tidak ditemukan.", errors: {} };
+  if (!hasil.ok) {
+    return { ok: false, error: hasil.error, errors: {} };
+  }
+
+  if (emailBerubah) {
+    // Termasuk sesi ini sendiri — orangnya akan diminta masuk lagi dengan
+    // alamat barunya, dan itu memang yang diharapkan.
+    revokeAllForUser(pengguna.id);
   }
 
   // Nama muncul di topbar, daftar tim, dan riwayat — segarkan semuanya.

@@ -122,6 +122,35 @@ export const users = {
     return hasil.changes === 0 ? null : users.byId(id);
   },
 
+  /**
+   * Perbarui identitas: nama, email, dan (opsional) foto.
+   *
+   * Email ikut di sini karena ia identitas login, bukan sekadar keterangan —
+   * memisahkannya jadi dua tulisan membuka celah salah satunya tersimpan
+   * sementara satunya gagal.
+   */
+  updateIdentity(
+    id: number,
+    input: { name: string; email: string; avatarUrl?: string | null }
+  ): User | null {
+    const db = getDb();
+    const hasil =
+      input.avatarUrl === undefined
+        ? db
+            .prepare(
+              "UPDATE users SET name = ?, email = ?, updated_at = datetime('now') WHERE id = ?"
+            )
+            .run(input.name, input.email, id)
+        : db
+            .prepare(
+              `UPDATE users SET name = ?, email = ?, avatar_url = ?, updated_at = datetime('now')
+               WHERE id = ?`
+            )
+            .run(input.name, input.email, input.avatarUrl, id);
+
+    return hasil.changes === 0 ? null : users.byId(id);
+  },
+
   setAccessLevel(id: number, level: User["accessLevel"]): User | null {
     const hasil = getDb()
       .prepare("UPDATE users SET access_level = ?, updated_at = datetime('now') WHERE id = ?")

@@ -24,7 +24,29 @@ export const ROLE_MAX = 60;
 
 /* Cukup memastikan bentuknya masuk akal — sama seperti di login-form.ts.
    Pola yang terlalu ketat menolak alamat yang sah. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Aturan email, satu tempat untuk semua yang memakainya.
+ *
+ * Dipakai pembuatan akun, perbaikan identitas oleh admin, dan penggantian
+ * email sendiri di halaman profil. Kalau tiga jalur ini punya aturannya
+ * masing-masing, cepat atau lambat salah satunya akan menerima alamat yang
+ * ditolak dua lainnya.
+ *
+ * `emailLain` adalah email akun LAIN dalam huruf kecil — pemanggilnya yang
+ * mengecualikan akun yang sedang disunting, supaya menyimpan tanpa mengubah
+ * email tidak dianggap bentrok dengan dirinya sendiri.
+ */
+export function validateEmail(email: string, emailLain: string[]): string | undefined {
+  const alamat = email.trim();
+  if (alamat === "") return "Email wajib diisi.";
+  if (!EMAIL.test(alamat)) return "Format email tidak valid.";
+  // Perbandingan huruf kecil, sejalan dengan idx_users_email_lower di skema.
+  // Tanpa ini dua baris bisa mewakili satu identitas login.
+  if (emailLain.includes(alamat.toLowerCase())) return "Email sudah dipakai akun lain.";
+  return undefined;
+}
 
 export function emptyUserDraft(): UserDraft {
   return {
@@ -58,12 +80,8 @@ export function validateUser(
   else if (name.length < NAME_MIN) errors.name = `Nama minimal ${NAME_MIN} karakter.`;
   else if (name.length > NAME_MAX) errors.name = `Nama maksimal ${NAME_MAX} karakter.`;
 
-  const email = draft.email.trim();
-  if (email === "") errors.email = "Email wajib diisi.";
-  else if (!EMAIL.test(email)) errors.email = "Format email tidak valid.";
-  // Perbandingan huruf kecil, sejalan dengan idx_users_email_lower di skema.
-  // Tanpa ini dua baris bisa mewakili satu identitas login.
-  else if (emailLain.includes(email.toLowerCase())) errors.email = "Email sudah dipakai akun lain.";
+  const galatEmail = validateEmail(draft.email, emailLain);
+  if (galatEmail) errors.email = galatEmail;
 
   if (draft.role.trim().length > ROLE_MAX) {
     errors.role = `Jabatan maksimal ${ROLE_MAX} karakter.`;

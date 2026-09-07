@@ -28,7 +28,7 @@ export default function ProfileForm({
 }) {
   const router = useRouter();
   const uid = useId();
-  const [draft, setDraft] = useState<ProfileDraft>({ name, avatarUrl: avatarUrl ?? "" });
+  const [draft, setDraft] = useState<ProfileDraft>({ name, avatarUrl: avatarUrl ?? "", email });
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -168,15 +168,26 @@ export default function ProfileForm({
       )}
 
       <div className="mt-5 grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
-        <label className="block text-sm">
+        <label className="block text-sm" htmlFor={`${uid}-email`}>
           <span className="font-medium">Email</span>
           <input
+            id={`${uid}-email`}
             type="email"
-            value={email}
-            readOnly
-            disabled
-            className="mt-1 w-full cursor-not-allowed rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted"
+            value={draft.email}
+            onChange={(e) => ubah("email", e.target.value)}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? `${uid}-email-error` : `${uid}-email-hint`}
+            className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent/20"
           />
+          {errors.email ? (
+            <p id={`${uid}-email-error`} className="mt-1 text-xs text-high">
+              {errors.email}
+            </p>
+          ) : (
+            <span id={`${uid}-email-hint`} className="mt-1 block text-xs text-muted">
+              Sekaligus alamat untuk masuk.
+            </span>
+          )}
         </label>
         <label className="block text-sm">
           <span className="font-medium">Peran</span>
@@ -187,11 +198,21 @@ export default function ProfileForm({
             disabled
             className="mt-1 w-full cursor-not-allowed rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted"
           />
+          <span className="mt-1 block text-xs text-muted">
+            Menentukan hak akses — hanya admin yang bisa mengubahnya.
+          </span>
         </label>
       </div>
-      <p className="mt-1 text-xs text-muted">
-        Email dan peran menentukan hak akses, jadi hanya admin yang bisa mengubahnya.
-      </p>
+
+      {draft.email.trim().toLowerCase() !== email.toLowerCase() && (
+        <p
+          role="status"
+          className="mt-3 rounded-lg border border-med/30 bg-med/10 p-2.5 text-sm text-med"
+        >
+          Mengganti email berarti mengganti alamat untuk masuk. Begitu disimpan, Anda akan
+          diminta masuk lagi memakai alamat yang baru.
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button

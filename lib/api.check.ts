@@ -43,6 +43,7 @@ import {
   getProjects,
   jumlahAdminAktif,
   setUserAccessLevel,
+  updateUserIdentity,
   setUserActive,
   setUserPassword,
   updateAgenda,
@@ -488,6 +489,51 @@ async function main() {
   assert.equal((await setUserAccessLevel(baru.id, "Manager"))!.accessLevel, "Manager");
   assert.equal((await getUsers()).find((u) => u.id === baru.id)!.accessLevel, "Manager");
   await setUserAccessLevel(baru.id, "Anggota");
+
+  /* --- Perbaikan identitas (nama & email) ---------------------------------- */
+
+  // Salah ketik nama dan email diperbaiki sekaligus.
+  const perbaikan = await updateUserIdentity(baru.id, {
+    name: "Nama Diperbaiki",
+    email: "diperbaiki@uji.co.id",
+  });
+  assert.equal(perbaikan.ok, true);
+  const sesudahPerbaikan = (await getUsers()).find((u) => u.id === baru.id)!;
+  assert.equal(sesudahPerbaikan.name, "Nama Diperbaiki");
+  assert.equal(sesudahPerbaikan.email, "diperbaiki@uji.co.id");
+
+  // Menyimpan tanpa mengganti email tidak boleh dianggap bentrok dengan diri
+  // sendiri — inilah yang membedakan emailTerpakai(x) dari emailTerpakai(x, id).
+  const tanpaGanti = await updateUserIdentity(baru.id, {
+    name: "Nama Diperbaiki Lagi",
+    email: "diperbaiki@uji.co.id",
+  });
+  assert.equal(tanpaGanti.ok, true);
+
+  // Email milik akun lain ditolak, tanpa memandang kapitalisasi.
+  const bentrok = await updateUserIdentity(baru.id, {
+    name: "Nama Diperbaiki Lagi",
+    email: akunAdmin.email.toUpperCase(),
+  });
+  assert.equal(bentrok.ok, false);
+  // Dan penolakan itu tidak boleh menyisakan perubahan separuh jalan.
+  assert.equal((await getUsers()).find((u) => u.id === baru.id)!.email, "diperbaiki@uji.co.id");
+
+  // Spasi pinggir dirapikan sebelum disimpan.
+  assert.equal(
+    (await updateUserIdentity(baru.id, { name: "Rapi", email: "  rapi@uji.co.id  " })).ok,
+    true
+  );
+  assert.equal((await getUsers()).find((u) => u.id === baru.id)!.email, "rapi@uji.co.id");
+
+  // Foto opsional: tidak dikirim berarti tidak diubah.
+  const fotoSemula = (await getUsers()).find((u) => u.id === baru.id)!.avatarUrl;
+  await updateUserIdentity(baru.id, { name: "Rapi", email: "rapi@uji.co.id" });
+  assert.equal((await getUsers()).find((u) => u.id === baru.id)!.avatarUrl, fotoSemula);
+
+  // Akun yang tidak ada ditolak, bukan diam-diam membuat baris baru.
+  const hantu = await updateUserIdentity(999_999, { name: "Hantu", email: "hantu@uji.co.id" });
+  assert.equal(hantu.ok, false);
 
   // Akun yang tidak ada tidak bisa agendaDiubah diam-diam.
   assert.equal(await setUserAccessLevel(999_999, "Admin"), null);

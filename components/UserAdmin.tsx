@@ -7,6 +7,7 @@ import {
   resetSandi,
   tambahPengguna,
   ubahAktifPengguna,
+  ubahIdentitasPengguna,
   ubahTingkatAkses,
 } from "@/lib/admin-actions";
 import { PASSWORD_MIN } from "@/lib/login-form";
@@ -39,6 +40,9 @@ export default function UserAdmin({ users, meId }: { users: User[]; meId: number
   const [kabar, setKabar] = useState<string | null>(null);
   const [resetId, setResetId] = useState<number | null>(null);
   const [sandiBaru, setSandiBaru] = useState("");
+  /** Baris yang sedang disunting identitasnya, beserta isian sementaranya. */
+  const [ubahId, setUbahId] = useState<number | null>(null);
+  const [identitas, setIdentitas] = useState({ name: "", email: "" });
 
   function set(field: keyof UserDraft, value: string) {
     setDraft((lama) => ({ ...lama, [field]: value }));
@@ -244,7 +248,24 @@ export default function UserAdmin({ users, meId }: { users: User[]; meId: number
                   type="button"
                   disabled={pending}
                   onClick={() => {
+                    const buka = ubahId !== u.id;
+                    setUbahId(buka ? u.id : null);
+                    setResetId(null);
+                    setErrors({});
+                    setGagal(null);
+                    if (buka) setIdentitas({ name: u.name, email: u.email });
+                  }}
+                  className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:bg-background"
+                >
+                  Ubah Identitas
+                </button>
+
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
                     setResetId(resetId === u.id ? null : u.id);
+                    setUbahId(null);
                     setSandiBaru("");
                   }}
                   className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:bg-background"
@@ -268,6 +289,79 @@ export default function UserAdmin({ users, meId }: { users: User[]; meId: number
                   {u.isActive ? "Nonaktifkan" : "Aktifkan"}
                 </button>
               </div>
+
+              {ubahId === u.id && (
+                <form
+                  noValidate
+                  className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const emailBerubah =
+                      identitas.email.trim().toLowerCase() !== u.email.toLowerCase();
+                    jalankan(
+                      () => ubahIdentitasPengguna(u.id, identitas.name, identitas.email),
+                      emailBerubah
+                        ? `Identitas ${identitas.name.trim()} diperbarui. Sesinya dicabut.`
+                        : `Nama ${identitas.name.trim()} diperbarui.`,
+                      () => setUbahId(null)
+                    );
+                  }}
+                >
+                  <label className="block text-sm">
+                    <span className="text-muted">Nama</span>
+                    <input
+                      type="text"
+                      value={identitas.name}
+                      disabled={pending}
+                      onChange={(e) => {
+                        setIdentitas((x) => ({ ...x, name: e.target.value }));
+                        setErrors((x) => ({ ...x, name: undefined }));
+                      }}
+                      className={`mt-1 ${fieldClass}`}
+                    />
+                    {errors.name && <p className="mt-1 text-xs text-high">{errors.name}</p>}
+                  </label>
+
+                  <label className="block text-sm">
+                    <span className="text-muted">Email</span>
+                    <input
+                      type="email"
+                      value={identitas.email}
+                      disabled={pending}
+                      onChange={(e) => {
+                        setIdentitas((x) => ({ ...x, email: e.target.value }));
+                        setErrors((x) => ({ ...x, email: undefined }));
+                      }}
+                      className={`mt-1 ${fieldClass}`}
+                    />
+                    {errors.email && <p className="mt-1 text-xs text-high">{errors.email}</p>}
+                  </label>
+
+                  {identitas.email.trim().toLowerCase() !== u.email.toLowerCase() && (
+                    <p className="rounded-lg border border-med/30 bg-med/10 p-2 text-xs text-med sm:col-span-2">
+                      Email adalah alamat untuk masuk. Menggantinya mencabut seluruh sesi
+                      {u.id === meId ? " Anda — Anda akan diminta masuk lagi." : ` ${u.name}.`}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-on-brand disabled:opacity-60"
+                    >
+                      {pending ? "Menyimpan…" : "Simpan"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUbahId(null)}
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {resetId === u.id && (
                 <form
