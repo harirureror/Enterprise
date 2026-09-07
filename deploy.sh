@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#
+# Deploy Dashboard Enterprise.
+#
+#   /srv/enterprise-dashboard/deploy.sh
+#
+# Ada karena satu jebakan yang pernah menjatuhkan produksi: menjalankan
+# `npm ci` sementara NODE_ENV=production membuat npm MELEWATKAN
+# devDependencies, dan Tailwind ada di sana. Build gagal, PM2 masuk status
+# errored, situsnya mati. Skrip ini memisahkan langkah pasang (butuh
+# devDependencies) dari langkah jalan (butuh NODE_ENV=production), supaya
+# urutan itu tidak pernah lagi bergantung pada ingatan.
+
+set -euo pipefail
+
+APP_DIR=/srv/enterprise-dashboard
+APP_NAME=enterprise
+PORT=3000
+
+cd "$APP_DIR"
+
+# Ikuti symlink, jangan patok versinya: menaikkan Node nanti cukup
+# mengarahkan ulang /usr/local/bin/node24 dan skrip ini ikut sendiri.
+NODE_BIN="$(dirname "$(readlink -f /usr/local/bin/node24)")"
+export PATH="$NODE_BIN:$PATH"
+
+echo "==> Node $(node -v) dari $NODE_BIN"
+echo "==> Sebelum: $(git log --oneline -1)"
+
+git fetch --quiet origin
+git reset --quiet --hard origin/main
+echo "==> Sesudah: $(git log --oneline -1)"
+
+# LANGKAH PASANG — sengaja TANPA NODE_ENV=production.
+echo "==> Memasang dependensi (termasuk devDependencies)"
+NODE_ENV=development npm ci --include=dev --no-audit --no-fund >/dev/null
+
+# Build lama disingkirkan, bukan dihapus: proses yang sedang berjalan masih
+# memegang berkasnya, dan kalau build baru gagal kita masih bisa kembali.
+rm -rf .next.bak
+[ -d .next ] && mv .next .next.bak
+
+# LANGKAH BUILD — di sini NODE_ENV=production dan APP_BASE_PATH memang perlu.
+# Dibaca dari .env.production supaya nilainya satu sumber dengan yang dipakai
+# PM2 dan nginx; kalau ketiganya berselisih, asetnya menunjuk ke tempat yang
+# salah dan halamannya rusak tanpa pesan galat.
+set -a
+# shellcheck disable=SC1091
+. ./.env.production
+set +a
+
+echo "==> Build (APP_BASE_PATH=${APP_BASE_PATH:-<kosong>})"
+if ! npm run build; then
+  echo "!!! Build GAGAL — mengembalikan build sebelumnya, aplikasi tidak disentuh"
+  rm -rf .next
+  [ -d .next.bak ] && mv .next.bak .next
+  exit 1
+fi
+rm -rf .next.bak
+
+echo "==> Memuat ulang $APP_NAME"
+pm2 restart "$APP_NAME" --update-env >/dev/null
+
+# Pemeriksaan kesehatan: gagal di sini harus berisik, bukan diam-diam
+# meninggalkan situs mati seperti yang pernah terjadi.
+echo -n "==> Menunggu aplikasi siap "
+for i in $(seq 1 20); do
+  kode="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT${APP_BASE_PATH:-}/login" || true)"
+  if [ "$kode" = "200" ]; then
+    echo ""
+    echo "==> SEHAT — ${APP_BASE_PATH:-}/login menjawab 200"
+    pm2 save >/dev/null
+    exit 0
+  fi
+  echo -n "."
+  sleep 1
+done
+
+echo ""
+echo "!!! TIDAK SEHAT setelah 20 detik (kode terakhir: ${kode:-tidak ada})"
+echo "!!! Periksa: pm2 logs $APP_NAME --err --lines 30"
+exit 1
