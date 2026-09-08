@@ -1174,6 +1174,21 @@ dependensi dengan `NODE_ENV=development npm ci --include=dev`, dan baru memuat
    dan didahului satu cadangan database. Kalau ia gagal, `.next` belum disentuh dan
    PM2 belum di-restart, jadi versi lama terus melayani seperti biasa.
 
+**Skrip tidak boleh menimpa dirinya sendiri sambil berjalan.** `git reset --hard`
+mengganti `deploy.sh` di tengah eksekusinya, sementara bash membaca berkas skrip
+sambil menjalankannya. Akibatnya langkah yang **baru ditambahkan tidak ikut
+berjalan pada deploy yang memperkenalkannya** — bash meneruskan isi yang lama.
+
+Ini pernah terjadi, tepat pada rilis yang menambahkan langkah migrasi: deploy
+berjalan tampak mulus, PM2 hijau, `/dashboard/login` menjawab 200, tapi setiap
+halaman proyek mati dengan `no such table: project_activities` karena migrasinya
+tidak pernah dijalankan. Halaman login tetap 200 justru karena ia tidak menyentuh
+tabel proyek — jadi pemeriksaan kesehatan pun ikut tertipu.
+
+Skrip sekarang menarik kode **lebih dulu dan terpisah**, lalu `exec` dirinya yang
+baru tepat satu kali (dijaga `DEPLOY_KODE_SUDAH_BARU`). Sesudah titik itu, isi
+skrip yang berjalan sudah sama dengan isi berkasnya.
+
 **Migrasi tidak boleh dilupakan.** Kode yang menyebut kolom atau tabel baru akan
 menjatuhkan setiap halaman yang menyentuhnya kalau skemanya belum ikut naik. Karena
 itu langkahnya ada di dalam skrip (`npm run db:setup`), bukan di catatan terpisah —
@@ -1184,6 +1199,7 @@ unduhan `npx` saat deploy.
 
 | Gejala | Periksa |
 |---|---|
+| Halaman proyek 500 padahal login 200 | Skemanya tertinggal di belakang kode. Jalankan ulang `deploy.sh`; kalau perlu manual: `set -a; . ./.env.production; set +a; npm run db:setup; pm2 restart enterprise` |
 | Skrip berhenti di "Migrasi GAGAL" | Galat migrasi ada di keluarannya. Belum ada yang dibongkar; cadangan sebelum migrasi ada di `/srv/enterprise-backup` |
 | Skrip berhenti di "Build GAGAL" | Galat build ada di keluarannya. Situs masih hidup dengan versi lama; perbaiki kodenya, dorong, jalankan lagi |
 | Skrip berhenti di "TIDAK SEHAT" | `pm2 logs enterprise --err --lines 30` |

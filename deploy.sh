@@ -19,17 +19,34 @@ PORT=3000
 
 cd "$APP_DIR"
 
+# Skrip ini menimpa DIRINYA SENDIRI lewat git reset di bawah, dan bash membaca
+# berkas skrip sambil menjalankannya. Menukar isinya di tengah jalan membuat
+# bash melanjutkan dari posisi byte yang sudah tidak berarti apa-apa: langkah
+# yang baru ditambahkan bisa terlewat tanpa satu pun pesan galat.
+#
+# Ini pernah terjadi. Langkah migrasi disisipkan sebelum build, deploy berjalan
+# tampak mulus, dan setiap halaman proyek mati dengan "no such table" karena
+# migrasinya tidak pernah dijalankan.
+#
+# Jadi tarikan kode dikerjakan lebih dulu dan terpisah, lalu skrip menjalankan
+# ulang dirinya yang BARU tepat satu kali. Sesudah titik ini, isi skrip yang
+# berjalan sudah sama dengan isi berkasnya.
+if [ "${DEPLOY_KODE_SUDAH_BARU:-}" != "1" ]; then
+  echo "==> Sebelum: $(git log --oneline -1)"
+  git fetch --quiet origin
+  git reset --quiet --hard origin/main
+  echo "==> Sesudah: $(git log --oneline -1)"
+
+  export DEPLOY_KODE_SUDAH_BARU=1
+  exec bash "$APP_DIR/deploy.sh" "$@"
+fi
+
 # Ikuti symlink, jangan patok versinya: menaikkan Node nanti cukup
 # mengarahkan ulang /usr/local/bin/node24 dan skrip ini ikut sendiri.
 NODE_BIN="$(dirname "$(readlink -f /usr/local/bin/node24)")"
 export PATH="$NODE_BIN:$PATH"
 
 echo "==> Node $(node -v) dari $NODE_BIN"
-echo "==> Sebelum: $(git log --oneline -1)"
-
-git fetch --quiet origin
-git reset --quiet --hard origin/main
-echo "==> Sesudah: $(git log --oneline -1)"
 
 # LANGKAH PASANG — sengaja TANPA NODE_ENV=production.
 echo "==> Memasang dependensi (termasuk devDependencies)"
