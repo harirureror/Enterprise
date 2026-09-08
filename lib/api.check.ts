@@ -12,7 +12,6 @@ import {
   deleteActivityTemplate,
   deleteProjectActivity,
   getActivityTemplates,
-  getCurvaS,
   getProjectActivities,
   getProjectActivity,
   setActivityDone,
@@ -1018,6 +1017,7 @@ async function main() {
     weight: 10,
     status: "Selesai",
     slaDays: null,
+    startDate: "2026-09-20",
     targetDate: "2026-10-01",
     doneDate: null,
     doneBy: null,
@@ -1033,18 +1033,24 @@ async function main() {
   assert.equal(await deleteProjectActivity(tambahan.id), false);
   assert.equal((await getProject(proyekAktif.id))!.progressPct, sesudahCentang.progressPct);
 
-  // Kurva S: garis aktual berhenti di hari acuan, rencana proyekKosong tanpa target.
-  const kurva = await getCurvaS(proyekAktif.id, "2026-09-08");
-  assert.ok(kurva.titik.length > 0);
+  // Tanggal rencana dibagikan di dalam jendela kontrak proyek.
+  const berjadwal = await getProjectActivities(proyekAktif.id);
   assert.ok(
-    kurva.titik.every((t) => t.rencana === null),
-    "aktivitas hasil salinan belum punya tanggal target"
+    berjadwal.every((a) => a.startDate !== null && a.targetDate !== null),
+    "seed membagikan tanggal ke seluruh aktivitas"
   );
-  assert.equal(kurva.selisih, null, "tanpa rencana tidak ada selisih yang jujur");
-  assert.equal(kurva.totalBobot, bobotTotal);
-  assert.ok(kurva.titik.filter((t) => t.date > "2026-09-08").every((t) => t.aktual === null));
+  assert.ok(
+    berjadwal.every((a) => a.startDate! <= a.targetDate!),
+    "tidak ada rentang yang terbalik"
+  );
+  assert.ok(
+    berjadwal.every(
+      (a) => a.startDate! >= proyekAktif.startDate && a.targetDate! <= proyekAktif.deadline
+    ),
+    "rencana tidak boleh keluar dari jendela kontrak"
+  );
 
-  // Template hanya boleh disalin ke proyek yang daftarnya masih proyekKosong.
+  // Template hanya boleh disalin ke proyek yang daftarnya masih kosong.
   const sudahIsi = await applyTemplateToProject(proyekAktif.id);
   assert.equal(sudahIsi.ok, false);
 
@@ -1061,15 +1067,26 @@ async function main() {
   );
   // Salinan berdiri sendiri: tidak satu pun sudah tercentang.
   assert.ok((await getProjectActivities(proyekKosong.id)).every((a) => a.doneDate === null));
+  // Dan salinannya langsung berjadwal, di dalam jendela kontrak proyeknya —
+  // proyek yang lahir tanpa tanggal tidak akan pernah punya kurva S.
+  const salinan = await getProjectActivities(proyekKosong.id);
+  assert.ok(salinan.every((a) => a.startDate !== null && a.targetDate !== null));
+  assert.equal(salinan[0].startDate, proyekKosong.startDate, "mulai di awal kontrak");
+  assert.equal(
+    salinan[salinan.length - 1].targetDate,
+    proyekKosong.deadline,
+    "berakhir tepat di tenggat"
+  );
   assert.equal(await deleteProject(proyekKosong.id), true);
 
-  // CRUD template. Mengubah template TIDAK menggeser proyek yang sudah proyekAktif.
+  // CRUD template. Mengubah template TIDAK menggeser proyek yang sudah berjalan.
   const progresSebelumTemplate = (await getProject(proyekAktif.id))!.progressPct;
   const templateBaru = await createActivityTemplate(proyekAktif.type, {
     name: "Langkah percobaan",
     weight: 50,
     status: "Berjalan",
     slaDays: 3,
+    durationDays: 4,
   });
   assert.equal((await getProject(proyekAktif.id))!.progressPct, progresSebelumTemplate);
   assert.equal(
@@ -1090,6 +1107,7 @@ async function main() {
       weight: 10,
       status: "Berjalan",
       slaDays: null,
+      startDate: null,
       targetDate: null,
       doneDate: null,
       doneBy: null,

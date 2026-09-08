@@ -1,4 +1,5 @@
 import { getDb } from "./index";
+import { fromDay, toDay } from "../timeline";
 import type {
   ActivityTemplate,
   AgendaEntry,
@@ -347,6 +348,7 @@ function keTemplate(r: Row): ActivityTemplate {
     weight: angka(r.weight),
     status: teks(r.status) as ActivityTemplate["status"],
     slaDays: angkaAtauNull(r.sla_days),
+    durationDays: angkaAtauNull(r.duration_days),
     sortOrder: angka(r.sort_order),
   };
 }
@@ -374,9 +376,18 @@ export const activityTemplates = {
   insert(input: Omit<ActivityTemplate, "id">): ActivityTemplate {
     const db = getDb();
     db.prepare(
-      `INSERT INTO activity_templates (type_code, name, weight, status, sla_days, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(input.typeCode, input.name, input.weight, input.status, input.slaDays, input.sortOrder);
+      `INSERT INTO activity_templates
+         (type_code, name, weight, status, sla_days, duration_days, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      input.typeCode,
+      input.name,
+      input.weight,
+      input.status,
+      input.slaDays,
+      input.durationDays,
+      input.sortOrder
+    );
     const id = angka((db.prepare("SELECT last_insert_rowid() AS id").get() as Row).id);
     return { ...input, id };
   },
@@ -385,10 +396,19 @@ export const activityTemplates = {
     const hasil = getDb()
       .prepare(
         `UPDATE activity_templates
-           SET name = ?, weight = ?, status = ?, sla_days = ?, sort_order = ?
+           SET name = ?, weight = ?, status = ?, sla_days = ?,
+               duration_days = ?, sort_order = ?
          WHERE id = ?`
       )
-      .run(input.name, input.weight, input.status, input.slaDays, input.sortOrder, id);
+      .run(
+        input.name,
+        input.weight,
+        input.status,
+        input.slaDays,
+        input.durationDays,
+        input.sortOrder,
+        id
+      );
     return hasil.changes === 0 ? null : activityTemplates.byId(id);
   },
 
@@ -414,11 +434,42 @@ function keActivity(r: Row): ProjectActivity {
     weight: angka(r.weight),
     status: teks(r.status) as ProjectActivity["status"],
     slaDays: angkaAtauNull(r.sla_days),
+    startDate: teksAtauNull(r.start_date),
     targetDate: teksAtauNull(r.target_date),
     doneDate: teksAtauNull(r.done_date),
     doneBy: angkaAtauNull(r.done_by),
     sortOrder: angka(r.sort_order),
   };
+}
+
+/**
+ * Bagikan rentang proyek ke aktivitas template secara berurutan, menurut
+ * perbandingan lama pengerjaannya.
+ *
+ * Template tanpa `durationDays` memakai bobotnya sebagai pengganti: aktivitas
+ * yang menyumbang lebih banyak progres umumnya memang memakan lebih banyak
+ * waktu, dan menebak begitu masih jauh lebih berguna daripada mengosongkan
+ * tanggalnya.
+ */
+function bagikanTanggal(
+  template: ActivityTemplate[],
+  jendela: { mulai: string; akhir: string }
+): { mulai: string; akhir: string }[] {
+  const d0 = toDay(jendela.mulai);
+  const rentang = Math.max(toDay(jendela.akhir) - d0, 0);
+  const lama = template.map((t) => t.durationDays ?? t.weight ?? 0);
+  const total = lama.reduce((n, x) => n + x, 0);
+
+  let sampai = 0;
+  return template.map((_, i) => {
+    const sebelum = sampai;
+    sampai += lama[i];
+    if (total <= 0) return { mulai: jendela.mulai, akhir: jendela.akhir };
+    return {
+      mulai: fromDay(d0 + Math.round((rentang * sebelum) / total)),
+      akhir: fromDay(d0 + Math.round((rentang * sampai) / total)),
+    };
+  });
 }
 
 export const projectActivities = {
@@ -445,14 +496,16 @@ export const projectActivities = {
     const db = getDb();
     db.prepare(
       `INSERT INTO project_activities
-         (project_id, name, weight, status, sla_days, target_date, done_date, done_by, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (project_id, name, weight, status, sla_days, start_date, target_date,
+          done_date, done_by, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       input.projectId,
       input.name,
       input.weight,
       input.status,
       input.slaDays,
+      input.startDate,
       input.targetDate,
       input.doneDate,
       input.doneBy,
@@ -466,7 +519,8 @@ export const projectActivities = {
     const hasil = getDb()
       .prepare(
         `UPDATE project_activities SET
-           name = ?, weight = ?, status = ?, sla_days = ?, target_date = ?,
+           name = ?, weight = ?, status = ?, sla_days = ?,
+           start_date = ?, target_date = ?,
            done_date = ?, done_by = ?, sort_order = ?, updated_at = datetime('now')
          WHERE id = ?`
       )
@@ -475,6 +529,7 @@ export const projectActivities = {
         input.weight,
         input.status,
         input.slaDays,
+        input.startDate,
         input.targetDate,
         input.doneDate,
         input.doneBy,
@@ -502,21 +557,41 @@ export const projectActivities = {
    *
    * Disalin, bukan dirujuk: mengubah template kelak tidak boleh menggeser
    * progres proyek yang sudah berjalan.
+   *
+   * Kalau `jendela` diberikan, tanggal tiap aktivitas ikut dibagikan di dalam
+   * rentang itu menurut perbandingan `duration_days`. Tanpa itu proyek baru
+   * lahir dengan tabel kurva S yang kosong sama sekali, dan tabel kosong tidak
+   * akan pernah diisi tangan satu per satu oleh siapa pun.
    */
-  copyTemplateTo(projectId: number, typeCode: string): number {
+  copyTemplateTo(
+    projectId: number,
+    typeCode: string,
+    jendela?: { mulai: string; akhir: string }
+  ): number {
     const template = activityTemplates.byType(typeCode);
     if (template.length === 0) return 0;
+
+    const tanggal = jendela ? bagikanTanggal(template, jendela) : null;
 
     const db = getDb();
     db.exec("BEGIN");
     try {
       const insert = db.prepare(
         `INSERT INTO project_activities
-           (project_id, name, weight, status, sla_days, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?)`
+           (project_id, name, weight, status, sla_days, start_date, target_date, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
-      for (const t of template) {
-        insert.run(projectId, t.name, t.weight, t.status, t.slaDays, t.sortOrder);
+      for (const [i, t] of template.entries()) {
+        insert.run(
+          projectId,
+          t.name,
+          t.weight,
+          t.status,
+          t.slaDays,
+          tanggal?.[i].mulai ?? null,
+          tanggal?.[i].akhir ?? null,
+          t.sortOrder
+        );
       }
       db.exec("COMMIT");
       return template.length;

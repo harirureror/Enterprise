@@ -26,14 +26,7 @@ import {
   type User,
 } from "./types";
 import { type ProjectFilter, filterProjects } from "./filters";
-import {
-  type TitikKurva,
-  kurvaS,
-  progresDariAktivitas,
-  selisihRencana,
-  statusDariAktivitas,
-  totalBobot,
-} from "./activities";
+import { progresDariAktivitas, statusDariAktivitas } from "./activities";
 import * as store from "./db/store";
 import {
   type Coverage,
@@ -258,8 +251,6 @@ export type ProjectDetail = {
   dependencyCandidates: Project[];
   /** Checklist aktivitas, menurut urutannya. */
   activities: ProjectActivity[];
-  /** Kurva S yang diturunkan dari checklist itu. */
-  curva: CurvaS;
   /** Ada template untuk jenis proyek ini, jadi tombol "pakai template" berguna. */
   adaTemplate: boolean;
 };
@@ -302,7 +293,6 @@ export async function getProjectDetail(id: number): Promise<ProjectDetail | null
     dependencies: await getDependencies(id),
     dependencyCandidates: projects.filter((p) => p.id !== id),
     activities: store.projectActivities.byProject(id),
-    curva: await getCurvaS(id),
     adaTemplate: store.activityTemplates.byType(project.type).length > 0,
   };
 }
@@ -1250,7 +1240,10 @@ export async function applyTemplateToProject(
     return { ok: false, error: "Proyek ini sudah punya daftar aktivitas." };
   }
 
-  const jumlah = store.projectActivities.copyTemplateTo(projectId, project.type);
+  const jumlah = store.projectActivities.copyTemplateTo(projectId, project.type, {
+    mulai: project.startDate,
+    akhir: project.deadline,
+  });
   if (jumlah === 0) {
     return { ok: false, error: `Belum ada template aktivitas untuk jenis ${project.type}.` };
   }
@@ -1277,21 +1270,6 @@ export async function setProgressMode(
   return store.projects.byId(projectId);
 }
 
-export type CurvaS = {
-  titik: TitikKurva[];
-  /** Positif berarti mendahului rencana, negatif tertinggal. */
-  selisih: number | null;
-  totalBobot: number;
-};
-
-export async function getCurvaS(projectId: number, hariIni?: string): Promise<CurvaS> {
-  const activities = store.projectActivities.byProject(projectId);
-  return {
-    titik: kurvaS(activities, hariIni),
-    selisih: selisihRencana(activities, hariIni),
-    totalBobot: totalBobot(activities),
-  };
-}
 
 /* --- Rencana strategis ----------------------------------------------------- */
 

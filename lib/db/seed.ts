@@ -367,6 +367,37 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
       JOIN activity_templates t ON t.type_code = p.type;
 
       UPDATE projects SET progress_mode = 'manual';
+
+      -- Bagikan rentang kontrak ke aktivitasnya, aturannya sama dengan migrasi
+      -- 18. Tanpa ini pemasangan baru lahir dengan tabel kurva S yang kosong,
+      -- dan fitur yang tidak pernah terlihat sama saja dengan tidak ada.
+      WITH k AS (
+        SELECT
+          a.id,
+          p.start_date AS mulai,
+          CAST(julianday(p.deadline) - julianday(p.start_date) AS INTEGER) AS rentang,
+          a.weight,
+          SUM(a.weight) OVER (PARTITION BY a.project_id) AS total,
+          SUM(a.weight) OVER (
+            PARTITION BY a.project_id ORDER BY a.sort_order, a.id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS sampai
+        FROM project_activities a
+        JOIN projects p ON p.id = a.project_id
+        WHERE p.start_date IS NOT NULL AND p.deadline IS NOT NULL
+      )
+      UPDATE project_activities SET
+        start_date = (
+          SELECT date(k.mulai, '+' || CAST(
+            k.rentang * (k.sampai - k.weight) / NULLIF(k.total, 0) AS INTEGER) || ' days')
+          FROM k WHERE k.id = project_activities.id
+        ),
+        target_date = (
+          SELECT date(k.mulai, '+' || CAST(
+            k.rentang * k.sampai / NULLIF(k.total, 0) AS INTEGER) || ' days')
+          FROM k WHERE k.id = project_activities.id
+        )
+      WHERE id IN (SELECT id FROM k);
     `);
 
     // Riwayat paling akhir: menunjuk ke projects dan users sekaligus.

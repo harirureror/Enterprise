@@ -20,6 +20,7 @@ import {
   type ActivityDraft,
   type ActivityErrors,
   draftToActivity,
+  draftToTemplate,
   validateActivity,
 } from "@/lib/activity-form";
 
@@ -176,8 +177,7 @@ export async function simpanTemplateAktivitas(
     return { ok: false, error: "Periksa kembali isian Anda.", errors };
   }
 
-  const { name, weight, status, slaDays } = draftToActivity(draft);
-  await createActivityTemplate(typeCode, { name, weight, status, slaDays });
+  await createActivityTemplate(typeCode, draftToTemplate(draft));
 
   revalidatePath("/proyek/jenis");
   return { ok: true };
@@ -196,8 +196,7 @@ export async function perbaruiTemplateAktivitas(
     return { ok: false, error: "Periksa kembali isian Anda.", errors };
   }
 
-  const { name, weight, status, slaDays } = draftToActivity(draft);
-  const hasil = await updateActivityTemplate(id, { name, weight, status, slaDays, sortOrder });
+  const hasil = await updateActivityTemplate(id, { ...draftToTemplate(draft), sortOrder });
   if (hasil === null) return { ok: false, error: "Template tidak ditemukan.", errors: {} };
 
   revalidatePath("/proyek/jenis");

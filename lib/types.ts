@@ -309,7 +309,13 @@ export type ProjectActivity = {
    * `null` berarti tidak ada tenggat. Contoh: penawaran berlaku 14 hari.
    */
   slaDays: number | null;
-  /** ISO date; menggambar garis RENCANA di kurva S. */
+  /**
+   * ISO date. Bersama `targetDate` membentuk RENTANG kerja, dan bobotnya
+   * disebar rata sepanjang rentang itu di kurva S. `null` berarti bobotnya
+   * jatuh utuh di `targetDate`.
+   */
+  startDate: string | null;
+  /** ISO date; ujung rentang rencana di kurva S. */
   targetDate: string | null;
   /** ISO date; `null` berarti belum selesai. Menggambar garis AKTUAL. */
   doneDate: string | null;
@@ -325,6 +331,12 @@ export type ActivityTemplate = {
   weight: number;
   status: ProjectStatus;
   slaDays: number | null;
+  /**
+   * Perkiraan lama pengerjaan dalam hari. Template tidak punya tanggal —
+   * tanggal milik proyek, bukan cetakannya — tapi punya perbandingan lama,
+   * dan itulah yang dipakai membagikan tanggal saat template disalin.
+   */
+  durationDays: number | null;
   sortOrder: number;
 };
 

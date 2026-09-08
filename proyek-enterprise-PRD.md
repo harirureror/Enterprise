@@ -665,25 +665,61 @@ disalin, nama, bobot, tanggal, dan tenggatnya bebas disesuaikan per proyek.
 Bawaannya empat alur, masing-masing berjumlah 100: Penjualan (5 langkah), Jasa (7),
 Training (5), Riset (6).
 
-### Kurva S
+### Kurva S berbentuk master schedule
 
-SVG inline, tanpa pustaka grafik — sejalan dengan `TimelineChart` yang memakai div
-berposisi. Dua garis:
+Bentuknya mengikuti jadwal induk proyek konstruksi: **baris aktivitas, kolom periode,
+lalu baris TOTAL dan KUMULATIF**, dengan kurva digambar di atas baris kumulatif.
+SVG inline tanpa pustaka grafik, sejalan dengan `TimelineChart` yang memakai div
+berposisi.
 
-- **Rencana** — bobot kumulatif menurut `target_date`. Bernilai kosong dan **tidak
-  digambar sama sekali** kalau tidak ada satu pun tanggal target. Tanpa rencana yang
-  benar-benar disusun orang, garisnya cuma karangan.
-- **Aktual** — bobot kumulatif menurut `done_date`, dan **berhenti di hari ini**.
-  Menariknya sampai ujung rentang akan menggambar masa depan yang belum terjadi, dan
-  grafik yang menjanjikan hal seperti itu lebih buruk daripada grafik yang berhenti
-  apa adanya.
+**Bobot disebar sepanjang rentang, bukan ditumpuk di satu tanggal.** Tiap aktivitas
+punya `start_date` dan `target_date`; bobotnya dibagi rata **per hari** lalu
+dijumlahkan per periode. Pembagian per periode akan menggemukkan kolom pertama dan
+terakhir setiap kali sebuah aktivitas hanya menyentuh separuh bulan; pembagian per
+hari tidak. Inilah yang membuat garisnya melengkung, dan tanpa itu ia naik bertangga —
+bentuk yang tidak bisa dibandingkan dengan rencana siapa pun.
 
-Selisih keduanya pada hari ini ditulis sebagai kalimat ("Tertinggal 15% dari rencana"),
-dan angkanya juga tersedia sebagai tabel di balik "Lihat sebagai tabel" — grafik saja
-tidak bisa dibaca pembaca layar maupun disalin.
+**Satuan kolom mengikuti panjang proyek**, karena proyek divisi ini pendek: median
+31 hari, terpanjang 62 hari, dua di antaranya 0–4 hari. Kolom bulanan seperti master
+schedule konstruksi hanya akan menghasilkan satu-dua kolom.
 
-Migrasi sengaja **tidak** mengisi `target_date` proyek lama: tanggal target yang
-dikarang akan menghasilkan garis rencana yang terlihat resmi tanpa pernah disepakati.
+| Rentang | Satuan | Contoh nyata |
+|---|---|---|
+| ≤ 14 hari | Harian | Riset Carbon Stock (5 hari) → 5 kolom |
+| ≤ 120 hari | Mingguan | Batas Lahan (62 hari) → 9 kolom; survei sebulan → 5 kolom |
+| lebih | Bulanan | jadwal konstruksi 19 bulan → 19 kolom |
+
+Bisa ditukar manual lewat sakelar Harian/Mingguan/Bulanan; hitungannya murni dan
+berjalan di peramban, jadi menukar satuan tidak memanggil server.
+
+Dua garis:
+
+- **Rencana** — kumulatif dari sebaran di atas, selalu berakhir di 100%.
+- **Realisasi** — bobot yang tercentang, dan **berhenti di periode berjalan**.
+  Periode yang belum dimulai bernilai kosong, bukan nol: nol akan menggambar garis
+  yang jatuh ke dasar, seolah pekerjaannya berhenti.
+
+Seluruh angka dinormalkan ke persen dari **total bobot**, alasannya sama dengan
+`progresDariAktivitas`: daftar yang bobotnya belum genap tetap harus bisa mencapai
+100%. Selisih pada periode berjalan ditulis sebagai kalimat ("Tertinggal 20% dari
+rencana"), dan seluruh angkanya ada di tabel yang sama — grafik saja tidak bisa
+dibaca pembaca layar maupun disalin.
+
+### Dari mana tanggalnya datang
+
+Template membawa **`duration_days`**, bukan tanggal — tanggal milik proyek, bukan
+cetakannya. Saat template disalin ke proyek, rentang kontrak proyek
+(`start_date`..`deadline`) dibagi berurutan menurut perbandingan lama itu, sehingga
+**proyek baru lahir dengan kurva S yang sudah tergambar**. Tabel kosong yang harus
+diisi tangan satu per satu tidak akan pernah diisi siapa pun.
+
+Migrasi 18 membagikan tanggal ke 113 aktivitas yang sudah ada dengan aturan yang
+sama, hanya memakai **bobot** sebagai pengganti lama: aktivitas itu salinan yang boleh
+sudah disunting orang, dan mencocokkannya kembali ke template lewat nama akan
+diam-diam meleset begitu ada satu yang diganti namanya.
+
+Rentangnya rentang kontrak yang memang disepakati, jadi yang keluar bukan karangan —
+hanya pembagian yang masih kasar, dan tiap tanggalnya bisa digeser per aktivitas.
 
 ### Pengingat tindak lanjut
 
@@ -976,6 +1012,7 @@ erDiagram
         int weight
         string status
         int sla_days
+        int duration_days
         int sort_order
     }
 
@@ -986,6 +1023,7 @@ erDiagram
         int weight
         string status
         int sla_days
+        date start_date
         date target_date
         date done_date
         int done_by FK
@@ -1089,7 +1127,7 @@ komponen server. Menambah pintu kedua berarti menduakan penjaganya.
 | Sandi | scrypt (`node:crypto`) | |
 | Notifikasi | Dihitung dari keadaan proyek, ditampilkan di aplikasi | Belum ada pengiriman email |
 | Ekspor | `write-excel-file`, `docx`, `pdf-lib` | Ketiganya JavaScript murni |
-| Pengujian | Berkas `*.check.ts` berbasis `assert`, dijalankan `npx tsx` | 32 berkas, tanpa kerangka uji. Tiap modul murni punya berkas ceknya sendiri; jalankan satu-satu atau seluruhnya |
+| Pengujian | Berkas `*.check.ts` berbasis `assert`, dijalankan `npx tsx` | 33 berkas, tanpa kerangka uji. Tiap modul murni punya berkas ceknya sendiri; jalankan satu-satu atau seluruhnya |
 | Hosting | **VPS Ubuntu + PM2 + nginx**, di belakang Cloudflare | Lihat §8a |
 
 **Aplikasi ini tidak bisa dipasang di platform serverless** (Vercel, Netlify,

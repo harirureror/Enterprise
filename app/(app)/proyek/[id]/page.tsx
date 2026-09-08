@@ -60,7 +60,6 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
     dependencies,
     dependencyCandidates,
     activities,
-    curva,
     adaTemplate,
   } =
     detail;
@@ -158,12 +157,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             <div className="mt-5 border-t border-border pt-4">
               <h3 className="text-sm font-medium">Kurva S</h3>
               <div className="mt-3">
-                <CurvaS
-                  titik={curva.titik}
-                  selisih={curva.selisih}
-                  totalBobot={curva.totalBobot}
-                  hariIni={hariIni}
-                />
+                <CurvaS activities={activities} hariIni={hariIni} />
               </div>
             </div>
           )}

@@ -13,6 +13,7 @@ import {
   type ActivityDraft,
   type ActivityErrors,
   emptyActivityDraft,
+  templateToDraft,
 } from "@/lib/activity-form";
 import { PROJECT_STATUSES, type ActivityTemplate } from "@/lib/types";
 import { statusClass } from "@/lib/ui";
@@ -113,8 +114,13 @@ export default function ActivityTemplateEditor({
                   <span className="min-w-0">
                     <span className="block text-sm font-medium leading-snug">{t.name}</span>
                     <span className="mt-0.5 block text-xs text-muted">
-                      bobot {t.weight}%
-                      {t.slaDays ? ` · tindak lanjut ${t.slaDays} hari` : ""}
+                      {[
+                        `bobot ${t.weight}%`,
+                        t.durationDays ? `± ${t.durationDays} hari` : null,
+                        t.slaDays ? `tindak lanjut ${t.slaDays} hari` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
@@ -126,13 +132,7 @@ export default function ActivityTemplateEditor({
                         setEditId(t.id);
                         setErrors({});
                         setGagal(null);
-                        setDraft({
-                          name: t.name,
-                          weight: String(t.weight),
-                          status: t.status,
-                          slaDays: t.slaDays === null ? "" : String(t.slaDays),
-                          targetDate: "",
-                        });
+                        setDraft(templateToDraft(t));
                       }}
                       className="rounded-lg border border-border px-2 py-1 text-sm text-muted hover:bg-surface"
                     >
@@ -221,7 +221,29 @@ export default function ActivityTemplateEditor({
                 {errors.status && <p className="mt-1 text-xs text-high">{errors.status}</p>}
               </label>
 
-              <label className="block text-sm sm:col-span-2">
+              <label className="block text-sm">
+                <span className="font-medium">
+                  Lama pengerjaan <span className="font-normal text-muted">(hari)</span>
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={draft.durationDays}
+                  onChange={(e) => set("durationDays", e.target.value)}
+                  placeholder="7"
+                  className={`mt-1 ${fieldClass}`}
+                />
+                {errors.durationDays ? (
+                  <p className="mt-1 text-xs text-high">{errors.durationDays}</p>
+                ) : (
+                  <span className="mt-1 block text-xs text-muted">
+                    Perbandingannya yang membagi tanggal saat template disalin.
+                  </span>
+                )}
+              </label>
+
+              <label className="block text-sm">
                 <span className="font-medium">
                   Tenggat tindak lanjut <span className="font-normal text-muted">(hari)</span>
                 </span>

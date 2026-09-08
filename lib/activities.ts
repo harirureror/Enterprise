@@ -57,80 +57,10 @@ export function totalBobot(activities: ActivityLike[]): number {
   return activities.reduce((n, a) => n + a.weight, 0);
 }
 
-export type TitikKurva = {
-  date: string;
-  /** Bobot kumulatif menurut tanggal target, 0-100. */
-  rencana: number | null;
-  /** Bobot kumulatif menurut tanggal selesai. `null` sesudah hari ini. */
-  aktual: number | null;
-};
-
-/**
- * Kurva S: rencana vs aktual.
- *
- * Garis aktual BERHENTI di hari ini. Menariknya sampai ujung rentang akan
- * menggambar masa depan yang belum terjadi, dan grafik yang menjanjikan hal
- * seperti itu lebih buruk daripada grafik yang berhenti apa adanya.
- *
- * Rencana bernilai `null` kalau tidak ada satu pun tanggal target — tanpa
- * rencana yang benar-benar disusun orang, garisnya cuma karangan.
- */
-export function kurvaS(activities: ActivityLike[], hariIni?: string): TitikKurva[] {
-  if (activities.length === 0) return [];
-
-  const acuan = hariIni ?? new Date().toISOString().slice(0, 10);
-  const total = totalBobot(activities);
-  if (total <= 0) return [];
-
-  const adaRencana = activities.some((a) => a.targetDate !== null);
-
-  // Tiap tanggal yang disebut aktivitas jadi satu titik, plus hari ini supaya
-  // garis aktual selalu punya ujung yang terlihat.
-  const tanggal = [
-    ...new Set(
-      [
-        ...activities.map((a) => a.targetDate),
-        ...activities.map((a) => a.doneDate),
-        acuan,
-      ].filter((d): d is string => d !== null)
-    ),
-  ].sort();
-
-  return tanggal.map((date) => {
-    const rencanaBobot = activities
-      .filter((a) => a.targetDate !== null && a.targetDate <= date)
-      .reduce((n, a) => n + a.weight, 0);
-
-    const aktualBobot = activities
-      .filter((a) => a.doneDate !== null && a.doneDate <= date)
-      .reduce((n, a) => n + a.weight, 0);
-
-    return {
-      date,
-      rencana: adaRencana ? Math.round((rencanaBobot / total) * 100) : null,
-      aktual: date <= acuan ? Math.round((aktualBobot / total) * 100) : null,
-    };
-  });
-}
-
-/**
- * Selisih progres terhadap rencana pada hari tertentu.
- *
- * Positif berarti mendahului rencana, negatif berarti tertinggal. `null` kalau
- * tidak ada rencana untuk dibandingkan.
- */
-export function selisihRencana(activities: ActivityLike[], hariIni?: string): number | null {
-  const titik = kurvaS(activities, hariIni);
-  if (titik.length === 0) return null;
-
-  const acuan = hariIni ?? new Date().toISOString().slice(0, 10);
-  const sampaiKini = titik.filter((t) => t.date <= acuan);
-  const terakhir = sampaiKini[sampaiKini.length - 1] ?? titik[0];
-
-  return terakhir.rencana === null || terakhir.aktual === null
-    ? null
-    : terakhir.aktual - terakhir.rencana;
-}
+/* Kurva S pindah ke lib/schedule-curve.ts: bentuknya berubah dari deretan titik
+   menjadi tabel periode ala master schedule, dan hitungannya sudah cukup besar
+   untuk berdiri sendiri. Yang tersisa di sini adalah yang diturunkan dari
+   CENTANG, bukan dari tanggal. */
 
 export type TindakLanjut = {
   name: string;

@@ -3,16 +3,19 @@
  */
 import assert from "node:assert/strict";
 import {
+  DURASI_MAX,
   NAME_MAX,
   NAME_MIN,
   SLA_MAX,
   type ActivityDraft,
   activityToDraft,
   draftToActivity,
+  draftToTemplate,
   emptyActivityDraft,
+  templateToDraft,
   validateActivity,
 } from "./activity-form";
-import type { ProjectActivity } from "./types";
+import type { ActivityTemplate, ProjectActivity } from "./types";
 
 const d = (over: Partial<ActivityDraft> = {}): ActivityDraft => ({
   ...emptyActivityDraft(),
@@ -70,6 +73,36 @@ assert.ok(validateActivity(d({ targetDate: "bukan tanggal" })).targetDate);
 // jadi isian yang salah pun tidak dipersoalkan di sana.
 assert.deepEqual(validateActivity(d({ targetDate: "2026-02-30" }), { template: true }), {});
 
+/* --- Tanggal mulai dan rentangnya ------------------------------------------- */
+
+assert.deepEqual(validateActivity(d({ startDate: "" })), {});
+assert.ok(validateActivity(d({ startDate: "2026-02-30" })).startDate, "tanggal mustahil");
+assert.deepEqual(validateActivity(d({ startDate: "2026-10-01", targetDate: "2026-10-31" })), {});
+// Rentang sehari sah: aktivitas yang memang selesai dalam sehari.
+assert.deepEqual(validateActivity(d({ startDate: "2026-10-01", targetDate: "2026-10-01" })), {});
+
+// Rentang terbalik ditolak di sini, bukan dibetulkan diam-diam oleh grafiknya.
+assert.ok(
+  validateActivity(d({ startDate: "2026-10-31", targetDate: "2026-10-01" })).targetDate,
+  "target sebelum mulai harus ditolak"
+);
+// Salah satunya kosong bukan rentang terbalik.
+assert.deepEqual(validateActivity(d({ startDate: "2026-10-31", targetDate: "" })), {});
+
+/* --- Lama pengerjaan (template saja) ---------------------------------------- */
+
+// Di proyek, isian ini diabaikan: yang berlaku tanggalnya.
+assert.deepEqual(validateActivity(d({ durationDays: "-5" })), {});
+
+assert.deepEqual(validateActivity(d({ durationDays: "" }), { template: true }), {});
+assert.ok(validateActivity(d({ durationDays: "0" }), { template: true }).durationDays);
+assert.ok(validateActivity(d({ durationDays: "-5" }), { template: true }).durationDays);
+assert.ok(validateActivity(d({ durationDays: "3.5" }), { template: true }).durationDays);
+assert.deepEqual(validateActivity(d({ durationDays: String(DURASI_MAX) }), { template: true }), {});
+assert.ok(
+  validateActivity(d({ durationDays: String(DURASI_MAX + 1) }), { template: true }).durationDays
+);
+
 /* --- draftToActivity -------------------------------------------------------- */
 
 const jadi = draftToActivity(
@@ -97,6 +130,7 @@ const tersimpan: ProjectActivity = {
   weight: 15,
   status: "Negosiasi",
   slaDays: 7,
+  startDate: "2026-10-20",
   targetDate: "2026-11-02",
   doneDate: "2026-10-30",
   doneBy: 2,
@@ -107,10 +141,40 @@ assert.equal(pulang.name, tersimpan.name);
 assert.equal(pulang.weight, tersimpan.weight);
 assert.equal(pulang.status, tersimpan.status);
 assert.equal(pulang.slaDays, tersimpan.slaDays);
+assert.equal(pulang.startDate, tersimpan.startDate);
 assert.equal(pulang.targetDate, tersimpan.targetDate);
 
 // Aktivitas tanpa tenggat pulang tanpa tenggat, bukan dengan "null" sebagai teks.
 assert.equal(activityToDraft({ ...tersimpan, slaDays: null, targetDate: null }).slaDays, "");
 assert.equal(activityToDraft({ ...tersimpan, slaDays: null, targetDate: null }).targetDate, "");
+assert.equal(activityToDraft({ ...tersimpan, startDate: null }).startDate, "");
+
+/* --- Template: tanggal tidak ikut, lama pengerjaan ikut --------------------- */
+
+const cetakan: ActivityTemplate = {
+  id: 9,
+  typeCode: "Jasa",
+  name: "Mobilisasi tim",
+  weight: 15,
+  status: "Berjalan",
+  slaDays: null,
+  durationDays: 5,
+  sortOrder: 4,
+};
+const draftCetakan = templateToDraft(cetakan);
+assert.equal(draftCetakan.durationDays, "5");
+// Tanggal sengaja kosong: ia milik proyek, bukan cetakannya.
+assert.equal(draftCetakan.startDate, "");
+assert.equal(draftCetakan.targetDate, "");
+
+const pulangCetakan = draftToTemplate(draftCetakan);
+assert.equal(pulangCetakan.name, cetakan.name);
+assert.equal(pulangCetakan.weight, cetakan.weight);
+assert.equal(pulangCetakan.durationDays, 5);
+assert.equal(pulangCetakan.slaDays, null);
+
+// Kosong jadi null, bukan 0 — "belum diisi" berbeda dari "nol hari".
+assert.equal(draftToTemplate(d({ durationDays: "" })).durationDays, null);
+assert.equal(templateToDraft({ ...cetakan, durationDays: null }).durationDays, "");
 
 console.log("ok: activity-form");

@@ -194,7 +194,11 @@ export default function ActivityChecklist({
                         <span className="mt-0.5 block text-xs text-muted">
                           {[
                             `bobot ${a.weight}%`,
-                            a.targetDate ? `target ${formatDate(a.targetDate)}` : null,
+                            a.startDate && a.targetDate
+                              ? `${formatDate(a.startDate)} – ${formatDate(a.targetDate)}`
+                              : a.targetDate
+                                ? `target ${formatDate(a.targetDate)}`
+                                : null,
                             a.doneDate ? `selesai ${formatDate(a.doneDate)}` : null,
                             a.slaDays ? `tindak lanjut ${a.slaDays} hari` : null,
                           ]
@@ -304,6 +308,25 @@ export default function ActivityChecklist({
 
           <label className="block text-sm">
             <span className="font-medium">
+              Tanggal mulai <span className="font-normal text-muted">(opsional)</span>
+            </span>
+            <input
+              type="date"
+              value={draft.startDate}
+              onChange={(e) => set("startDate", e.target.value)}
+              className={`mt-1 ${fieldClass}`}
+            />
+            {errors.startDate ? (
+              <p className="mt-1 text-xs text-high">{errors.startDate}</p>
+            ) : (
+              <span className="mt-1 block text-xs text-muted">
+                Bobotnya disebar rata dari sini sampai tanggal target.
+              </span>
+            )}
+          </label>
+
+          <label className="block text-sm">
+            <span className="font-medium">
               Tanggal target <span className="font-normal text-muted">(opsional)</span>
             </span>
             <input
@@ -316,7 +339,7 @@ export default function ActivityChecklist({
               <p className="mt-1 text-xs text-high">{errors.targetDate}</p>
             ) : (
               <span className="mt-1 block text-xs text-muted">
-                Yang menggambar garis rencana di kurva S.
+                Ujung rentang rencana di kurva S.
               </span>
             )}
           </label>

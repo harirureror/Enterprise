@@ -770,4 +770,72 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_project_activities_project ON project_activities(project_id, sort_order);
     `,
   },
+  {
+    id: 18,
+    name: "rentang-aktivitas-untuk-kurva-s",
+    up: `
+      -- Rencana butuh RENTANG, bukan satu tanggal. Dengan satu tanggal saja,
+      -- seluruh bobot sebuah aktivitas jatuh di satu hari dan kurva S naik
+      -- bertangga alih-alih melengkung — bentuk yang tidak bisa dibandingkan
+      -- dengan master schedule mana pun.
+      ALTER TABLE project_activities ADD COLUMN start_date TEXT
+        CHECK (start_date IS NULL OR start_date LIKE '____-__-__');
+
+      -- Template tidak punya tanggal (tanggal milik proyek, bukan cetakannya),
+      -- tapi punya LAMA pengerjaan. Inilah yang membuat proyek baru langsung
+      -- lahir dengan garis rencana, bukan tabel kosong yang harus diisi tangan.
+      ALTER TABLE activity_templates ADD COLUMN duration_days INTEGER
+        CHECK (duration_days IS NULL OR duration_days > 0);
+
+      -- Lama pengerjaan tiap langkah. Angkanya perkiraan kasar yang bisa
+      -- disunting per jenis; yang penting perbandingannya masuk akal, karena
+      -- itulah yang menentukan bentuk kurvanya.
+      UPDATE activity_templates SET duration_days = CASE
+        WHEN status = 'Prospect'  THEN 3
+        WHEN status = 'Penawaran' THEN 7
+        WHEN status = 'Negosiasi' THEN 7
+        WHEN status = 'Selesai'   THEN 10
+        ELSE 14
+      END;
+
+      -- Bagikan tanggal ke aktivitas yang sudah ada: rentang kontrak proyek
+      -- (start_date .. deadline) dibagi berurutan menurut perbandingan BOBOT.
+      --
+      -- Sengaja bobot, bukan duration_days template: aktivitas ini salinan yang
+      -- boleh sudah disunting orang, dan mencocokkannya kembali ke template
+      -- lewat nama akan diam-diam meleset begitu ada satu yang diganti
+      -- namanya. Bobot ada di barisnya sendiri dan tidak bisa salah pasang.
+      --
+      -- Rentangnya rentang kontrak yang memang disepakati, jadi garis rencana
+      -- yang keluar bukan karangan — hanya pembagian yang masih kasar, dan
+      -- tiap tanggalnya bisa digeser per aktivitas.
+      WITH k AS (
+        SELECT
+          a.id,
+          p.start_date AS mulai,
+          CAST(julianday(p.deadline) - julianday(p.start_date) AS INTEGER) AS rentang,
+          a.weight,
+          SUM(a.weight) OVER (PARTITION BY a.project_id) AS total,
+          SUM(a.weight) OVER (
+            PARTITION BY a.project_id ORDER BY a.sort_order, a.id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS sampai
+        FROM project_activities a
+        JOIN projects p ON p.id = a.project_id
+        WHERE p.start_date IS NOT NULL AND p.deadline IS NOT NULL
+      )
+      UPDATE project_activities SET
+        start_date = (
+          SELECT date(k.mulai, '+' || CAST(
+            k.rentang * (k.sampai - k.weight) / NULLIF(k.total, 0) AS INTEGER) || ' days')
+          FROM k WHERE k.id = project_activities.id
+        ),
+        target_date = (
+          SELECT date(k.mulai, '+' || CAST(
+            k.rentang * k.sampai / NULLIF(k.total, 0) AS INTEGER) || ' days')
+          FROM k WHERE k.id = project_activities.id
+        )
+      WHERE id IN (SELECT id FROM k);
+    `,
+  },
 ];

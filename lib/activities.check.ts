@@ -4,9 +4,7 @@
 import assert from "node:assert/strict";
 import {
   type ActivityLike,
-  kurvaS,
   progresDariAktivitas,
-  selisihRencana,
   statusDariAktivitas,
   tindakLanjutTerlewat,
   totalBobot,
@@ -87,54 +85,7 @@ assert.equal(statusDariAktivitas(acak, "Prospect"), "Negosiasi");
 // Mencentang yang belakangan saja tetap memakai yang TERAKHIR menurut urutan.
 assert.equal(statusDariAktivitas(lompat, "Prospect"), "Berjalan");
 
-/* --- kurvaS ----------------------------------------------------------------- */
-
-assert.deepEqual(kurvaS([], "2026-09-10"), []);
-
-// Tanpa satu pun tanggal target, garis rencana null — bukan garis karangan.
-const tanpaRencana = centang(alur(), 1, "2026-09-01");
-const kTanpa = kurvaS(tanpaRencana, "2026-09-10");
-assert.ok(kTanpa.length > 0);
-assert.ok(kTanpa.every((t) => t.rencana === null), "tanpa target_date tidak ada garis rencana");
-assert.equal(kTanpa[kTanpa.length - 1].aktual, 30);
-
-// Dengan tanggal target, rencana naik bertahap.
-const berencana: ActivityLike[] = [
-  a("A", 25, "Prospect", { sortOrder: 0, targetDate: "2026-09-01", doneDate: "2026-09-01" }),
-  a("B", 25, "Penawaran", { sortOrder: 1, targetDate: "2026-09-10", doneDate: "2026-09-12" }),
-  a("C", 25, "Berjalan", { sortOrder: 2, targetDate: "2026-09-20" }),
-  a("D", 25, "Selesai", { sortOrder: 3, targetDate: "2026-09-30" }),
-];
-const k = kurvaS(berencana, "2026-09-15");
-
-// Titiknya menaik dan tidak ada tanggal ganda.
-assert.deepEqual(
-  k.map((t) => t.date),
-  [...new Set(k.map((t) => t.date))].sort()
-);
-assert.equal(k.find((t) => t.date === "2026-09-01")!.rencana, 25);
-assert.equal(k.find((t) => t.date === "2026-09-10")!.rencana, 50);
-assert.equal(k.find((t) => t.date === "2026-09-30")!.rencana, 100);
-
-// Garis aktual BERHENTI di hari ini: yang sesudahnya null, bukan diteruskan.
-assert.equal(k.find((t) => t.date === "2026-09-15")!.aktual, 50);
-assert.equal(k.find((t) => t.date === "2026-09-20")!.aktual, null);
-assert.equal(k.find((t) => t.date === "2026-09-30")!.aktual, null);
-// Sedangkan rencananya tetap digambar sampai ujung — itu memang rencana.
-assert.equal(k.find((t) => t.date === "2026-09-20")!.rencana, 75);
-
-// Hari ini selalu ikut jadi titik, walau tidak ada aktivitas bertanggal itu.
-assert.ok(k.some((t) => t.date === "2026-09-15"));
-
-/* --- selisihRencana --------------------------------------------------------- */
-
-// 12 Sep: rencana 50 (A+B), aktual 50 (A+B selesai) -> pas.
-assert.equal(selisihRencana(berencana, "2026-09-12"), 0);
-// 10 Sep: rencana 50, aktual baru 25 karena B baru selesai 12 Sep -> tertinggal.
-assert.equal(selisihRencana(berencana, "2026-09-10"), -25);
-// Tanpa rencana tidak ada yang bisa dibandingkan.
-assert.equal(selisihRencana(tanpaRencana, "2026-09-10"), null);
-assert.equal(selisihRencana([], "2026-09-10"), null);
+/* Kurva S sekarang diuji di lib/schedule-curve.check.ts. */
 
 /* --- tindakLanjutTerlewat --------------------------------------------------- */
 

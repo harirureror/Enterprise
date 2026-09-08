@@ -1213,9 +1213,32 @@ for (const baris of contoh) {
   assert.equal(sudah, seharusnya, `aktivitas ${baris.aktivitas} pada proyek Negosiasi`);
 }
 
-// target_date sengaja kosong: tanpa rencana yang disusun orang, garis rencana
-// di kurva S hanya akan jadi karangan.
-assert.equal(hitung("SELECT COUNT(*) AS n FROM project_activities WHERE target_date IS NOT NULL"), 0);
+// Tiap aktivitas berjadwal, dan jadwalnya tidak pernah keluar dari jendela
+// kontrak proyeknya. Rentang itulah yang menyebarkan bobot di kurva S, jadi
+// satu baris tanpa tanggal sudah cukup membuat garis rencananya bolong.
+assert.equal(
+  hitung("SELECT COUNT(*) AS n FROM project_activities WHERE start_date IS NULL OR target_date IS NULL"),
+  0,
+  "seluruh aktivitas harus punya rentang"
+);
+assert.equal(
+  hitung("SELECT COUNT(*) AS n FROM project_activities WHERE start_date > target_date"),
+  0,
+  "tidak ada rentang yang terbalik"
+);
+assert.equal(
+  hitung(`SELECT COUNT(*) AS n FROM project_activities a JOIN projects p ON p.id = a.project_id
+          WHERE a.start_date < p.start_date OR a.target_date > p.deadline`),
+  0,
+  "rencana tidak boleh keluar dari jendela kontrak"
+);
+
+// Tiap template punya perkiraan lama pengerjaan — itulah yang membagi tanggal
+// saat template disalin ke proyek baru.
+assert.equal(
+  hitung("SELECT COUNT(*) AS n FROM activity_templates WHERE duration_days IS NULL"),
+  0
+);
 
 // Jenis di luar keempat kategori ditolak database, sama seperti projects.type.
 assert.throws(
