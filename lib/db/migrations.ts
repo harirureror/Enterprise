@@ -607,4 +607,46 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_plan_comments_plan ON plan_comments(plan_id, posted_at);
     `,
   },
+  {
+    id: 16,
+    name: "luaran-rencana",
+    up: `
+      -- Apa saja yang DIHASILKAN sebuah rencana. Sebelumnya hanya proyek yang
+      -- tercatat, padahal riset menghasilkan jurnal, kegiatan menghasilkan
+      -- portofolio, dan pelatihan menghasilkan sertifikasi. Proyek kini salah
+      -- satu jenis luaran, bukan kategori tersendiri.
+      CREATE TABLE plan_outputs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id     INTEGER NOT NULL REFERENCES strategic_plans(id) ON DELETE CASCADE,
+        kind        TEXT NOT NULL
+                      CHECK (kind IN ('Jurnal', 'Portofolio', 'Sertifikasi',
+                                      'Produk', 'Proyek Turunan')),
+        title       TEXT NOT NULL,
+        -- SET NULL, bukan CASCADE: proyek boleh dihapus dari daftar, tapi
+        -- catatan bahwa rencana ini pernah melahirkannya tetap berharga.
+        -- Inilah yang menguat dibanding plan_projects, yang dulu ikut lenyap.
+        project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        url         TEXT NOT NULL DEFAULT '',
+        -- Kapan luarannya terwujud. NULL untuk yang masih diupayakan.
+        achieved_at TEXT CHECK (achieved_at IS NULL OR achieved_at LIKE '____-__-__'),
+        note        TEXT NOT NULL DEFAULT '',
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Kaitan rencana-proyek yang lama pindah ke sini apa adanya. Judulnya
+      -- diambil dari nama proyek supaya barisnya tetap terbaca kalau proyeknya
+      -- kelak dihapus dan project_id jadi NULL.
+      INSERT INTO plan_outputs (plan_id, kind, title, project_id, sort_order)
+      SELECT pp.plan_id, 'Proyek Turunan', p.name, pp.project_id, pp.project_id
+      FROM plan_projects pp
+      JOIN projects p ON p.id = pp.project_id;
+
+      DROP TABLE plan_projects;
+
+      CREATE INDEX idx_plan_outputs_plan ON plan_outputs(plan_id, sort_order);
+      CREATE INDEX idx_plan_outputs_project ON plan_outputs(project_id);
+    `,
+  },
 ];

@@ -2,6 +2,7 @@ import { getDb } from "./index";
 import type {
   AgendaEntry,
   PlanComment,
+  PlanOutput,
   PlanProspect,
   PlanStep,
   StrategicPlan,
@@ -984,39 +985,90 @@ export const planProspects = {
 
 /* --- plan_projects ---------------------------------------------------------- */
 
-export const planProjects = {
-  all(): { planId: number; projectId: number }[] {
+function kePlanOutput(r: Row): PlanOutput {
+  return {
+    id: angka(r.id),
+    planId: angka(r.plan_id),
+    kind: teks(r.kind) as PlanOutput["kind"],
+    title: teks(r.title),
+    projectId: angkaAtauNull(r.project_id),
+    url: teks(r.url),
+    achievedAt: teksAtauNull(r.achieved_at),
+    note: teks(r.note),
+    sortOrder: angka(r.sort_order),
+  };
+}
+
+export const planOutputs = {
+  all(): PlanOutput[] {
     return getDb()
-      .prepare("SELECT plan_id, project_id FROM plan_projects")
+      .prepare("SELECT * FROM plan_outputs ORDER BY plan_id, sort_order, id")
       .all()
-      .map((r) => ({
-        planId: angka((r as Row).plan_id),
-        projectId: angka((r as Row).project_id),
-      }));
+      .map((r) => kePlanOutput(r as Row));
   },
 
-  byPlan(planId: number): number[] {
+  byPlan(planId: number): PlanOutput[] {
     return getDb()
-      .prepare("SELECT project_id FROM plan_projects WHERE plan_id = ? ORDER BY project_id")
+      .prepare("SELECT * FROM plan_outputs WHERE plan_id = ? ORDER BY sort_order, id")
       .all(planId)
-      .map((r) => angka((r as Row).project_id));
+      .map((r) => kePlanOutput(r as Row));
   },
 
-  /** Ganti seluruh kaitan satu rencana sekaligus — semua atau tidak sama sekali. */
-  replaceFor(planId: number, projectIds: number[]): void {
+  byId(id: number): PlanOutput | null {
+    const r = getDb().prepare("SELECT * FROM plan_outputs WHERE id = ?").get(id);
+    return r ? kePlanOutput(r as Row) : null;
+  },
+
+  insert(input: Omit<PlanOutput, "id">): PlanOutput {
     const db = getDb();
-    db.exec("BEGIN");
-    try {
-      db.prepare("DELETE FROM plan_projects WHERE plan_id = ?").run(planId);
-      const insert = db.prepare(
-        "INSERT INTO plan_projects (plan_id, project_id) VALUES (?, ?)"
+    db.prepare(
+      `INSERT INTO plan_outputs
+         (plan_id, kind, title, project_id, url, achieved_at, note, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      input.planId,
+      input.kind,
+      input.title,
+      input.projectId,
+      input.url,
+      input.achievedAt,
+      input.note,
+      input.sortOrder
+    );
+    const id = angka((db.prepare("SELECT last_insert_rowid() AS id").get() as Row).id);
+    return { ...input, id };
+  },
+
+  update(id: number, input: Omit<PlanOutput, "id" | "planId">): PlanOutput | null {
+    const hasil = getDb()
+      .prepare(
+        `UPDATE plan_outputs SET
+           kind = ?, title = ?, project_id = ?, url = ?, achieved_at = ?, note = ?,
+           sort_order = ?, updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .run(
+        input.kind,
+        input.title,
+        input.projectId,
+        input.url,
+        input.achievedAt,
+        input.note,
+        input.sortOrder,
+        id
       );
-      for (const id of projectIds) insert.run(planId, id);
-      db.exec("COMMIT");
-    } catch (err) {
-      db.exec("ROLLBACK");
-      throw err;
-    }
+    return hasil.changes === 0 ? null : planOutputs.byId(id);
+  },
+
+  remove(id: number): boolean {
+    return getDb().prepare("DELETE FROM plan_outputs WHERE id = ?").run(id).changes > 0;
+  },
+
+  nextSortOrder(planId: number): number {
+    const r = getDb()
+      .prepare("SELECT COALESCE(MAX(sort_order) + 1, 0) AS n FROM plan_outputs WHERE plan_id = ?")
+      .get(planId) as Row;
+    return angka(r.n);
   },
 };
 

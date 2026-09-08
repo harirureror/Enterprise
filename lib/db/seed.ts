@@ -17,7 +17,7 @@ import {
   agenda,
   comments,
   credentials,
-  planProjects,
+  planOutputs,
   planProspects,
   planSteps,
   projectDependencies,
@@ -51,7 +51,7 @@ export type SeedHasil = {
   plans: number;
   planSteps: number;
   planProspects: number;
-  planProjects: number;
+  planOutputs: number;
   /** Seed dilewati karena database sudah berisi. */
   dilewati: boolean;
 };
@@ -69,7 +69,7 @@ const KOSONG: SeedHasil = {
   plans: 0,
   planSteps: 0,
   planProspects: 0,
-  planProjects: 0,
+  planOutputs: 0,
   dilewati: true,
 };
 
@@ -130,10 +130,20 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
       updated_at = excluded.updated_at
   `);
 
-  const insertPlanProject = db.prepare(`
-    INSERT INTO plan_projects (plan_id, project_id)
-    VALUES (?, ?)
-    ON CONFLICT(plan_id, project_id) DO NOTHING
+  const insertPlanOutput = db.prepare(`
+    INSERT INTO plan_outputs
+      (id, plan_id, kind, title, project_id, url, achieved_at, note, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      plan_id = excluded.plan_id,
+      kind = excluded.kind,
+      title = excluded.title,
+      project_id = excluded.project_id,
+      url = excluded.url,
+      achieved_at = excluded.achieved_at,
+      note = excluded.note,
+      sort_order = excluded.sort_order,
+      updated_at = datetime('now')
   `);
 
   const insertAgenda = db.prepare(`
@@ -427,8 +437,10 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
         x.updatedAt
       );
     }
-    for (const l of planProjects) {
-      insertPlanProject.run(l.planId, l.projectId);
+    for (const o of planOutputs) {
+      insertPlanOutput.run(
+        o.id, o.planId, o.kind, o.title, o.projectId, o.url, o.achievedAt, o.note, o.sortOrder
+      );
     }
     db.exec("COMMIT");
   } catch (err) {
@@ -449,7 +461,7 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
     plans: strategicPlans.length,
     planSteps: planSteps.length,
     planProspects: planProspects.length,
-    planProjects: planProjects.length,
+    planOutputs: planOutputs.length,
     dilewati: false,
   };
 }

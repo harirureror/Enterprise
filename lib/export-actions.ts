@@ -114,7 +114,7 @@ export async function exportProjects(
             // Seluruh proyek, bukan hasil saring layar: kaitan rencana-proyek
             // tidak ada hubungannya dengan filter daftar proyek.
             projects: await getProjects(),
-            planProjects: store.planProjects.all(),
+            planOutputs: store.planOutputs.all(),
             users,
             format,
             tanggal,

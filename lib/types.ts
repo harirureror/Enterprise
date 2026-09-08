@@ -438,13 +438,39 @@ export type PlanProspect = {
 };
 
 /**
- * Kaitan rencana ke proyek yang lahir darinya. Banyak-ke-banyak: satu rencana
- * bisa melahirkan beberapa proyek, dan satu proyek bisa melayani lebih dari
- * satu rencana.
+ * Apa yang DIHASILKAN sebuah rencana.
+ *
+ * Sebelumnya hanya proyek yang tercatat, padahal riset menghasilkan jurnal,
+ * kegiatan menghasilkan portofolio, dan pelatihan menghasilkan sertifikasi.
+ * Proyek kini salah satu jenis luaran, bukan kategori tersendiri.
  */
-export type ProjectPlanLink = {
+export type PlanOutputKind =
+  | "Jurnal"
+  | "Portofolio"
+  | "Sertifikasi"
+  | "Produk"
+  | "Proyek Turunan";
+
+export const PLAN_OUTPUT_KINDS: PlanOutputKind[] = [
+  "Jurnal",
+  "Portofolio",
+  "Sertifikasi",
+  "Produk",
+  "Proyek Turunan",
+];
+
+export type PlanOutput = {
+  id: number;
   planId: number;
-  projectId: number;
+  kind: PlanOutputKind;
+  title: string;
+  /** Terisi hanya untuk "Proyek Turunan"; `null` kalau proyeknya sudah dihapus. */
+  projectId: number | null;
+  url: string;
+  /** ISO date; `null` untuk luaran yang masih diupayakan. */
+  achievedAt: string | null;
+  note: string;
+  sortOrder: number;
 };
 
 /** Komentar pada rencana. Bentuknya sama dengan ProjectComment, tabelnya beda. */

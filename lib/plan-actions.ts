@@ -13,7 +13,10 @@ import {
   getPlanProspect,
   getPlanStep,
   getUsers,
-  setPlanProjects,
+  createPlanOutput,
+  deletePlanOutput,
+  getPlanOutput,
+  updatePlanOutput,
   setPlanStepStatus,
   updatePlan,
   updatePlanProspect,
@@ -31,6 +34,10 @@ import {
   draftToPlan,
   draftToProspect,
   draftToStep,
+  type OutputDraft,
+  type OutputErrors,
+  draftToOutput,
+  validateOutput,
   validatePlan,
   validateProspect,
   validateStep,
@@ -245,22 +252,56 @@ export async function hapusProspek(id: number): Promise<ProspectHasil> {
   return { ok: true };
 }
 
-/* --- Kaitan proyek dan komentar --------------------------------------------- */
+/* --- Luaran dan komentar ---------------------------------------------------- */
 
-export async function aturProyekRencana(
-  planId: number,
-  projectIds: number[]
-): Promise<PlanHasil> {
+export type OutputHasil = { ok: true } | { ok: false; error: string; errors: OutputErrors };
+
+/** Catat satu luaran rencana: jurnal, portofolio, sertifikasi, produk, atau proyek. */
+export async function simpanLuaran(planId: number, draft: OutputDraft): Promise<OutputHasil> {
   const ditolak = await tolakKalauTakBoleh("kelola-rencana");
   if (ditolak) return ditolak;
 
-  // Id datang dari klien: apa pun yang bukan bilangan bulat dibuang di sini.
-  const bersih = projectIds.filter((n) => Number.isInteger(n));
+  const errors = validateOutput(draft);
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, error: "Periksa kembali isian Anda.", errors };
+  }
 
-  const hasil = await setPlanProjects(planId, bersih);
+  const hasil = await createPlanOutput(planId, draftToOutput(draft));
   if (!hasil.ok) return { ok: false, error: hasil.error, errors: {} };
 
   segarkan(planId);
+  return { ok: true };
+}
+
+export async function perbaruiLuaran(id: number, draft: OutputDraft): Promise<OutputHasil> {
+  const ditolak = await tolakKalauTakBoleh("kelola-rencana");
+  if (ditolak) return ditolak;
+
+  const lama = await getPlanOutput(id);
+  if (!lama) return { ok: false, error: "Luaran tidak ditemukan.", errors: {} };
+
+  const errors = validateOutput(draft);
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, error: "Periksa kembali isian Anda.", errors };
+  }
+
+  // sortOrder dipertahankan: urutan daftar bukan urusan formulir ini.
+  const hasil = await updatePlanOutput(id, { ...draftToOutput(draft), sortOrder: lama.sortOrder });
+  if (!hasil.ok) return { ok: false, error: hasil.error, errors: {} };
+
+  segarkan(lama.planId);
+  return { ok: true };
+}
+
+export async function hapusLuaran(id: number): Promise<OutputHasil> {
+  const ditolak = await tolakKalauTakBoleh("kelola-rencana");
+  if (ditolak) return ditolak;
+
+  const lama = await getPlanOutput(id);
+  if (!lama) return { ok: false, error: "Luaran tidak ditemukan atau sudah dihapus.", errors: {} };
+
+  await deletePlanOutput(id);
+  segarkan(lama.planId);
   return { ok: true };
 }
 

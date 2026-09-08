@@ -9,7 +9,7 @@ import type {
   Project,
   ProjectTypeInfo,
   ProjectComment,
-  ProjectPlanLink,
+  PlanOutput,
   Reminder,
   ReminderSchedule,
   User,
@@ -784,8 +784,12 @@ export const planProspects: PlanProspect[] = [
   { id: 5, planId: 2, name: "Universitas Diponegoro", contact: "", region: "Jawa Tengah", status: "Menjadi Klien", note: "Sudah berjalan lewat proyek Riset Carbon Stock.", updatedAt: "2026-09-01" },
 ];
 
-/** Kaitan ke proyek yang sudah ada: 1 = Riset Carbon Stock, 2 = MOU ITERA. */
-export const planProjects: ProjectPlanLink[] = [
-  { planId: 2, projectId: 1 },
-  { planId: 2, projectId: 2 },
+/* Luaran rencana. Dua di antaranya proyek yang sudah ada (1 = Riset Carbon
+   Stock, 2 = MOU ITERA); sisanya menunjukkan bahwa riset tidak hanya
+   melahirkan proyek — ada jurnal dan portofolio yang juga hasil nyata. */
+export const planOutputs: PlanOutput[] = [
+  { id: 1, planId: 2, kind: "Proyek Turunan", title: "Riset Carbon Stock", projectId: 1, url: "", achievedAt: "2026-08-30", note: "", sortOrder: 0 },
+  { id: 2, planId: 2, kind: "Proyek Turunan", title: "MOU ITERA", projectId: 2, url: "", achievedAt: null, note: "", sortOrder: 1 },
+  { id: 3, planId: 2, kind: "Jurnal", title: "Estimasi carbon stock berbasis SLAM LiDAR", projectId: null, url: "", achievedAt: null, note: "Draf; ditargetkan terbit sebelum aturan pemerintah keluar.", sortOrder: 2 },
+  { id: 4, planId: 1, kind: "Portofolio", title: "Materi pelatihan Inspektur Tambang", projectId: null, url: "", achievedAt: null, note: "Dipakai ulang untuk angkatan berikutnya.", sortOrder: 0 },
 ];

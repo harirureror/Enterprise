@@ -11,7 +11,7 @@ import {
   comments as mockComments,
   progressHistory as mockProgress,
   agenda as mockAgenda,
-  planProjects as mockPlanProjects,
+  planOutputs as mockPlanOutputs,
   planProspects as mockPlanProspects,
   planSteps as mockPlanSteps,
   projects as mockProjects,
@@ -71,7 +71,9 @@ assert.ok(tabel.includes("agenda"));
 assert.ok(tabel.includes("strategic_plans"));
 assert.ok(tabel.includes("plan_steps"));
 assert.ok(tabel.includes("plan_prospects"));
-assert.ok(tabel.includes("plan_projects"));
+assert.ok(tabel.includes("plan_outputs"));
+// plan_projects dilebur ke plan_outputs oleh migrasi 16.
+assert.equal(tabel.includes("plan_projects"), false);
 assert.ok(tabel.includes("plan_comments"));
 // Notifikasi sengaja tidak punya tabel sendiri: isinya dihitung dari keadaan proyek.
 assert.equal(tabel.includes("notifications"), false);
@@ -129,7 +131,7 @@ assert.equal(jumlah.comments, mockComments.length);
 assert.equal(jumlah.plans, mockPlans.length);
 assert.equal(jumlah.planSteps, mockPlanSteps.length);
 assert.equal(jumlah.planProspects, mockPlanProspects.length);
-assert.equal(jumlah.planProjects, mockPlanProjects.length);
+assert.equal(jumlah.planOutputs, mockPlanOutputs.length);
 
 const hitung = (sql: string) => Number(db.prepare(sql).get()!.n);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM users"), mockUsers.length);
@@ -1119,16 +1121,39 @@ db.exec(
 db.exec("DELETE FROM users WHERE id = 920");
 assert.equal(db.prepare("SELECT owner_id FROM plan_steps WHERE id = 921").get()!.owner_id, null);
 
-// Menghapus PROYEK hanya memutus kaitannya; rencananya tetap ada. Inilah yang
-// membuat rencana aman dari perapian daftar proyek.
+// Menghapus PROYEK hanya melepas tautannya; baris luarannya TETAP ADA, dan
+// rencananya juga. Ini lebih kuat daripada plan_projects yang dulu: catatan
+// bahwa rencana ini pernah melahirkan proyek tidak ikut hilang.
 db.exec(
   `INSERT INTO projects (id, name, type, status, priority, start_date, deadline, owner_id)
    VALUES (930, 'Proyek berencana', 'Jasa', 'Berjalan', 'Rendah', '2026-09-01', '2026-09-30', 1)`
 );
-db.exec("INSERT INTO plan_projects (plan_id, project_id) VALUES (900, 930)");
+db.exec(
+  `INSERT INTO plan_outputs (id, plan_id, kind, title, project_id)
+   VALUES (940, 900, 'Proyek Turunan', 'Proyek berencana', 930)`
+);
 db.exec("DELETE FROM projects WHERE id = 930");
-assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_projects WHERE project_id = 930"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_outputs WHERE id = 940"), 1, "baris luaran bertahan");
+assert.equal(
+  db.prepare("SELECT project_id FROM plan_outputs WHERE id = 940").get()!.project_id,
+  null,
+  "hanya tautannya yang lepas"
+);
+assert.equal(
+  db.prepare("SELECT title FROM plan_outputs WHERE id = 940").get()!.title,
+  "Proyek berencana",
+  "judulnya tetap terbaca walau proyeknya sudah hilang"
+);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM strategic_plans WHERE id = 900"), 1);
+
+// Jenis luaran tertutup: nilai di luar daftar ditolak database.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO plan_outputs (plan_id, kind, title) VALUES (900, 'Piagam', 'Jenis asing')`
+    ),
+  "jenis luaran di luar daftar harus ditolak"
+);
 
 // Sebaliknya, menghapus RENCANA membawa serta seluruh isinya (CASCADE) — tidak
 // ada langkah, prospek, kaitan, atau komentar yang menggantung.
@@ -1136,12 +1161,12 @@ db.exec("DELETE FROM strategic_plans WHERE id = 900");
 assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_steps WHERE plan_id = 900"), 0);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_prospects WHERE plan_id = 900"), 0);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_comments WHERE plan_id = 900"), 0);
-assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_projects WHERE plan_id = 900"), 0);
+assert.equal(hitung("SELECT COUNT(*) AS n FROM plan_outputs WHERE plan_id = 900"), 0);
 
 const indeksRencana = db
   .prepare(
     `SELECT name FROM sqlite_master WHERE type = 'index'
-     AND tbl_name IN ('strategic_plans', 'plan_steps', 'plan_prospects', 'plan_comments')`
+     AND tbl_name IN ('strategic_plans', 'plan_steps', 'plan_prospects', 'plan_comments', 'plan_outputs')`
   )
   .all()
   .map((r) => String(r.name));
@@ -1150,6 +1175,8 @@ assert.ok(indeksRencana.includes("idx_plans_segment"));
 assert.ok(indeksRencana.includes("idx_plan_steps_plan"));
 assert.ok(indeksRencana.includes("idx_plan_prospects_plan"));
 assert.ok(indeksRencana.includes("idx_plan_comments_plan"));
+assert.ok(indeksRencana.includes("idx_plan_outputs_plan"));
+assert.ok(indeksRencana.includes("idx_plan_outputs_project"));
 
 db.close();
 

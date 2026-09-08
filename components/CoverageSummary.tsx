@@ -8,8 +8,6 @@ import { coverageSummary } from "@/lib/strategy";
 
 export default function CoverageSummary({ rows }: { rows: Coverage[] }) {
   const ringkas = coverageSummary(rows);
-  const dituju = rows.filter((c) => c.baru);
-  const dijangkau = rows.filter((c) => c.projects > 0);
 
   if (rows.length === 0) {
     return (
@@ -42,54 +40,68 @@ export default function CoverageSummary({ rows }: { rows: Coverage[] }) {
         </span>
       </div>
 
-      {dituju.length > 0 && (
-        <div className="mt-3">
-          <h3 className="text-label-caps text-muted uppercase">Wilayah baru yang dituju</h3>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {dituju.map((c) => (
-              <li
-                key={c.region}
-                className="rounded-lg bg-accent/10 px-2.5 py-1 text-sm text-accent ring-1 ring-accent/20"
-              >
-                {c.region}
-                <span className="ml-1.5 text-xs opacity-80">
-                  {c.plans > 0 && `${c.plans} rencana`}
-                  {c.plans > 0 && c.prospects > 0 && " · "}
-                  {c.prospects > 0 && `${c.prospects} prospek`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <p className="mt-1 max-w-2xl text-sm text-muted">
+        Wilayah yang sudah ada rencananya tapi belum ada proyeknya diletakkan paling atas —
+        itulah yang sedang dituju.
+      </p>
 
-      <div className="mt-4">
-        <h3 className="text-label-caps text-muted uppercase">Sudah ada proyek</h3>
-        {dijangkau.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">Belum ada proyek dengan wilayah terisi.</p>
-        ) : (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {dijangkau.map((c) => (
-              <li
-                key={c.region}
-                className="rounded-lg bg-background px-2.5 py-1 text-sm text-muted"
-              >
-                {c.region}
-                <span className="ml-1.5 text-xs">
-                  {c.projects} proyek
-                  {c.plans > 0 && ` · ${c.plans} rencana`}
-                </span>
-              </li>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[34rem] text-sm">
+          <caption className="sr-only">
+            Wilayah terdampak: jumlah proyek berjalan, rencana, dan calon klien di tiap wilayah
+          </caption>
+          <thead>
+            <tr className="border-b border-border text-left text-label-caps text-muted">
+              <th scope="col" className="py-2 pr-3 font-medium">
+                Wilayah
+              </th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">
+                Proyek
+              </th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">
+                Rencana
+              </th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">
+                Prospek
+              </th>
+              <th scope="col" className="py-2 font-medium">
+                Keterangan
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.region} className="border-b border-border last:border-0">
+                <th scope="row" className="py-2 pr-3 text-left font-medium">
+                  {c.region}
+                </th>
+                <td className="py-2 pr-3 text-right tabular-nums">{c.projects}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{c.plans}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{c.prospects}</td>
+                <td className="py-2">
+                  {c.baru ? (
+                    <span className="rounded px-1.5 py-0.5 text-xs text-accent ring-1 ring-accent/30">
+                      Sedang dituju
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted">Sudah ada proyek</span>
+                  )}
+                </td>
+              </tr>
             ))}
-          </ul>
-        )}
+          </tbody>
+        </table>
       </div>
 
-      <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
-        Wilayah dicocokkan apa adanya. Kalau satu daerah muncul dua kali dengan ejaan
-        berbeda, itu tanda pengisiannya perlu diseragamkan — bukan digabung otomatis
-        oleh sistem, yang bisa saja salah menebak.
-      </p>
+      {/* Ejaan yang berbeda sengaja TIDAK digabung otomatis — itu masalah
+          keseragaman pengisian yang perlu terlihat, bukan disembunyikan. */}
+      {rows.length > 1 && (
+        <p className="mt-3 text-xs text-muted">
+          Wilayah dicocokkan apa adanya. Ejaan yang berbeda (mis. &ldquo;Kepri&rdquo; dan
+          &ldquo;Kepulauan Riau&rdquo;) tampil sebagai dua baris.
+        </p>
+      )}
+
     </section>
   );
 }

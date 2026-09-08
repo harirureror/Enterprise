@@ -6,6 +6,7 @@ import {
   type AccessLevel,
   type AgendaEntry,
   type PlanComment,
+  type PlanOutput,
   type PlanProspect,
   type PlanStep,
   type ProgressEntry,
@@ -1134,15 +1135,17 @@ export async function getPlans(filter: PlanFilter = {}): Promise<PlanView[]> {
 }
 
 export type PlanStepView = PlanStep & { owner: User | null };
+/** Luaran beserta proyeknya; `project` null kalau bukan proyek atau sudah dihapus. */
+export type PlanOutputView = PlanOutput & { project: Project | null };
 export type PlanCommentView = PlanComment & { user: User | null };
 
 export type PlanDetail = {
   plan: PlanView;
   steps: PlanStepView[];
   prospects: PlanProspect[];
-  /** Proyek nyata yang lahir dari rencana ini. */
-  projects: Project[];
-  /** Proyek yang bisa dipilih; seluruhnya kecuali yang sudah tertaut. */
+  /** Apa saja yang dihasilkan rencana ini — jurnal, portofolio, proyek, dsb. */
+  outputs: PlanOutputView[];
+  /** Proyek yang bisa dipilih saat jenis luarannya "Proyek Turunan". */
   projectCandidates: Project[];
   comments: PlanCommentView[];
 };
@@ -1155,7 +1158,7 @@ export async function getPlanDetail(id: number): Promise<PlanDetail | null> {
   const projects = await getProjects();
   const steps = store.planSteps.byPlan(id);
   const prospects = store.planProspects.byPlan(id);
-  const tertaut = store.planProjects.byPlan(id);
+  const outputs = store.planOutputs.byPlan(id);
 
   return {
     plan: lengkapiPlan(plan, steps, prospects, users),
@@ -1164,7 +1167,10 @@ export async function getPlanDetail(id: number): Promise<PlanDetail | null> {
       owner: s.ownerId === null ? null : users.find((u) => u.id === s.ownerId) ?? null,
     })),
     prospects,
-    projects: projects.filter((p) => tertaut.includes(p.id)),
+    outputs: outputs.map((o) => ({
+      ...o,
+      project: o.projectId === null ? null : projects.find((p) => p.id === o.projectId) ?? null,
+    })),
     projectCandidates: projects,
     comments: store.planComments
       .byPlan(id)
@@ -1257,29 +1263,71 @@ export async function deletePlanProspect(id: number): Promise<boolean> {
   return store.planProspects.remove(id);
 }
 
+export async function getPlanOutputs(planId: number): Promise<PlanOutput[]> {
+  return store.planOutputs.byPlan(planId);
+}
+
+export async function getPlanOutput(id: number): Promise<PlanOutput | null> {
+  return store.planOutputs.byId(id);
+}
+
 /**
- * Tetapkan proyek mana saja yang lahir dari rencana ini, menggantikan daftar
- * lama. Proyek yang tidak ada diabaikan diam-diam? Tidak — ditolak, supaya
- * kaitan yang salah ketik tidak hilang tanpa jejak.
+ * Catat satu luaran rencana.
+ *
+ * Nomor urut ditentukan di sini, bukan dikirim klien. Proyek yang ditunjuk
+ * diperiksa keberadaannya: kaitan yang salah ketik tidak boleh hilang tanpa
+ * jejak, sama seperti dulu di setPlanProjects.
  */
-export async function setPlanProjects(
+export async function createPlanOutput(
   planId: number,
-  projectIds: number[]
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  input: Omit<PlanOutput, "id" | "planId" | "sortOrder">
+): Promise<{ ok: true; output: PlanOutput } | { ok: false; error: string }> {
   if (store.plans.byId(planId) === null) {
     return { ok: false, error: "Rencana tidak ditemukan." };
   }
+  const salah = await proyekLuaranSalah(input);
+  if (salah) return { ok: false, error: salah };
 
-  const diminta = [...new Set(projectIds)];
-  const semua = await getProjects();
-  for (const id of diminta) {
-    if (!semua.some((p) => p.id === id)) {
-      return { ok: false, error: "Ada proyek yang tidak ditemukan." };
-    }
+  return {
+    ok: true,
+    output: store.planOutputs.insert({
+      ...input,
+      planId,
+      sortOrder: store.planOutputs.nextSortOrder(planId),
+    }),
+  };
+}
+
+export async function updatePlanOutput(
+  id: number,
+  input: Omit<PlanOutput, "id" | "planId">
+): Promise<{ ok: true; output: PlanOutput } | { ok: false; error: string }> {
+  const salah = await proyekLuaranSalah(input);
+  if (salah) return { ok: false, error: salah };
+
+  const output = store.planOutputs.update(id, input);
+  return output === null
+    ? { ok: false, error: "Luaran tidak ditemukan." }
+    : { ok: true, output };
+}
+
+export async function deletePlanOutput(id: number): Promise<boolean> {
+  return store.planOutputs.remove(id);
+}
+
+/** `null` kalau sah. Dipakai bersama oleh createPlanOutput dan updatePlanOutput. */
+async function proyekLuaranSalah(
+  input: Pick<PlanOutput, "kind" | "projectId">
+): Promise<string | null> {
+  if (input.projectId === null) return null;
+
+  // Proyek hanya bermakna untuk jenis "Proyek Turunan"; menempelkannya di
+  // jenis lain akan membuat daftar luaran menyesatkan.
+  if (input.kind !== "Proyek Turunan") {
+    return 'Hanya luaran berjenis "Proyek Turunan" yang bisa ditautkan ke proyek.';
   }
-
-  store.planProjects.replaceFor(planId, diminta);
-  return { ok: true };
+  const semua = await getProjects();
+  return semua.some((p) => p.id === input.projectId) ? null : "Proyek tidak ditemukan.";
 }
 
 export async function createPlanComment(input: {

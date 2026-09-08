@@ -1,5 +1,6 @@
 import { coverage, planProgress, prospectWins } from "../strategy";
 import type {
+  PlanOutput,
   PlanProspect,
   PlanStep,
   Project,
@@ -23,8 +24,8 @@ export type PlansInput = {
   steps: PlanStep[];
   prospects: PlanProspect[];
   projects: Project[];
-  /** Kaitan rencana-proyek; diteruskan apa adanya dari store. */
-  planProjects: { planId: number; projectId: number }[];
+  /** Luaran tiap rencana; diteruskan apa adanya dari store. */
+  planOutputs: PlanOutput[];
   users: User[];
   format: "excel" | "word" | "pdf";
   tanggal: string;
@@ -46,7 +47,7 @@ export const KOLOM_RENCANA: ExportColumn[] = [
   { key: "langkah", header: "Langkah Selesai", kind: "text", width: 14 },
   { key: "telat", header: "Langkah Telat", kind: "integer", width: 13 },
   { key: "prospek", header: "Prospek Jadi Klien", kind: "text", width: 17 },
-  { key: "proyek", header: "Proyek Terkait", kind: "text", width: 34 },
+  { key: "luaran", header: "Luaran", kind: "text", width: 34 },
   { key: "outcome", header: "Ukuran Keberhasilan", kind: "text", width: 34 },
 ];
 
@@ -69,6 +70,16 @@ const KOLOM_PROSPEK: ExportColumn[] = [
   { key: "note", header: "Catatan", kind: "text", width: 30 },
 ];
 
+const KOLOM_LUARAN: ExportColumn[] = [
+  { key: "plan", header: "Rencana", kind: "text", width: 30 },
+  { key: "kind", header: "Jenis", kind: "text", width: 16 },
+  { key: "title", header: "Judul", kind: "text", width: 40 },
+  { key: "project", header: "Proyek Tertaut", kind: "text", width: 28 },
+  { key: "achievedAt", header: "Tercapai", kind: "date", width: 12 },
+  { key: "url", header: "Tautan", kind: "text", width: 34 },
+  { key: "note", header: "Catatan", kind: "text", width: 30 },
+];
+
 const KOLOM_JANGKAUAN: ExportColumn[] = [
   { key: "region", header: "Wilayah", kind: "text", width: 22 },
   { key: "projects", header: "Proyek Berjalan", kind: "integer", width: 15 },
@@ -78,7 +89,7 @@ const KOLOM_JANGKAUAN: ExportColumn[] = [
 ];
 
 export async function berkasRencana(input: PlansInput): Promise<Buffer> {
-  const { plans, steps, prospects, projects, planProjects, users, format, tanggal } = input;
+  const { plans, steps, prospects, projects, planOutputs, users, format, tanggal } = input;
 
   const nama = (id: number | null) =>
     id === null ? "" : users.find((u) => u.id === id)?.name ?? `Anggota ${id}`;
@@ -89,9 +100,7 @@ export async function berkasRencana(input: PlansInput): Promise<Buffer> {
     const miliknya = steps.filter((s) => s.planId === p.id);
     const prospekNya = prospects.filter((x) => x.planId === p.id);
     const progres = planProgress(miliknya, tanggal);
-    const tertaut = new Set(
-      planProjects.filter((x) => x.planId === p.id).map((x) => x.projectId)
-    );
+    const luaranNya = planOutputs.filter((o) => o.planId === p.id);
 
     return {
       title: p.title,
@@ -109,10 +118,7 @@ export async function berkasRencana(input: PlansInput): Promise<Buffer> {
       langkah: `${progres.selesai}/${progres.total}`,
       telat: progres.telat,
       prospek: `${prospectWins(prospekNya)}/${prospekNya.length}`,
-      proyek: projects
-        .filter((pr) => tertaut.has(pr.id))
-        .map((pr) => pr.name)
-        .join(", "),
+      luaran: luaranNya.map((o) => `${o.kind}: ${o.title}`).join(", "),
       outcome: p.outcome,
     };
   });
@@ -147,6 +153,16 @@ export async function berkasRencana(input: PlansInput): Promise<Buffer> {
     note: x.note,
   }));
 
+  const barisLuaran: Row[] = planOutputs.map((o) => ({
+    plan: judulRencana(o.planId),
+    kind: o.kind,
+    title: o.title,
+    project: o.projectId === null ? "" : projects.find((p) => p.id === o.projectId)?.name ?? "",
+    achievedAt: o.achievedAt,
+    url: o.url,
+    note: o.note,
+  }));
+
   const barisJangkauan: Row[] = coverage(projects, plans, prospects).map((c) => ({
     region: c.region,
     projects: c.projects,
@@ -156,7 +172,7 @@ export async function berkasRencana(input: PlansInput): Promise<Buffer> {
   }));
 
   const catatan = [
-    `${plans.length} rencana · ${steps.length} langkah · ${prospects.length} prospek · dicetak ${tanggal}`,
+    `${plans.length} rencana · ${steps.length} langkah · ${prospects.length} prospek · ${planOutputs.length} luaran · dicetak ${tanggal}`,
     "Progres diturunkan dari langkah yang tuntas; langkah yang dibatalkan tidak dihitung.",
   ];
 
@@ -164,6 +180,7 @@ export async function berkasRencana(input: PlansInput): Promise<Buffer> {
     { nama: "Rencana", columns: KOLOM_RENCANA, rows: barisRencana, kosong: "Belum ada rencana strategis." },
     { nama: "Langkah", columns: KOLOM_LANGKAH, rows: barisLangkah, kosong: "Belum ada langkah tercatat." },
     { nama: "Prospek", columns: KOLOM_PROSPEK, rows: barisProspek, kosong: "Belum ada calon klien tercatat." },
+    { nama: "Luaran", columns: KOLOM_LUARAN, rows: barisLuaran, kosong: "Belum ada luaran tercatat." },
     { nama: "Jangkauan", columns: KOLOM_JANGKAUAN, rows: barisJangkauan, kosong: "Belum ada wilayah tercatat." },
   ];
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Badge from "@/components/Badge";
 import CommentThread from "@/components/CommentThread";
-import PlanProjectPicker from "@/components/PlanProjectPicker";
+import PlanOutputs from "@/components/PlanOutputs";
 import PlanProspects from "@/components/PlanProspects";
 import PlanSteps from "@/components/PlanSteps";
 import { getPlanDetail, getUsers } from "@/lib/api";
@@ -28,7 +28,7 @@ export default async function DetailRencanaPage({ params }: Params) {
   const detail = await getPlanDetail(Number(id));
   if (!detail) notFound();
 
-  const { plan, steps, prospects, projects, projectCandidates, comments } = detail;
+  const { plan, steps, prospects, outputs, projectCandidates, comments } = detail;
   const anggota = await getUsers({ activeOnly: true });
 
   const bolehUbah = can(pengguna.accessLevel, "kelola-rencana");
@@ -171,24 +171,14 @@ export default async function DetailRencanaPage({ params }: Params) {
         </section>
 
         <section
-          aria-labelledby="proyek-heading"
           className="rounded-xl border border-border bg-surface p-5 shadow-card lg:col-span-3"
         >
-          <h2 id="proyek-heading" className="text-headline-sm font-semibold">
-            Proyek yang Lahir dari Rencana Ini
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Menyambungkan niat dengan pelaksanaannya. Menghapus proyek hanya memutus
-            kaitannya — rencananya tetap ada.
-          </p>
-          <div className="mt-3">
-            <PlanProjectPicker
-              planId={plan.id}
-              candidates={projectCandidates}
-              selected={projects}
-              bolehUbah={bolehUbah}
-            />
-          </div>
+          <PlanOutputs
+            planId={plan.id}
+            outputs={outputs}
+            candidates={projectCandidates}
+            bolehUbah={bolehUbah}
+          />
         </section>
       </div>
 

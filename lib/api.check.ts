@@ -19,7 +19,9 @@ import {
   getPlanProspects,
   getPlanSteps,
   getPlans,
-  setPlanProjects,
+  createPlanOutput,
+  deletePlanOutput,
+  updatePlanOutput,
   setPlanStepStatus,
   updatePlan,
   updatePlanProspect,
@@ -799,21 +801,103 @@ async function main() {
     "prospek yang jadi klien ikut terhitung"
   );
 
-  // setPlanProjects MENGGANTI daftar, bukan menumpuk.
-  const duaProyek = semua.slice(0, 2).map((p) => p.id);
-  assert.deepEqual(await setPlanProjects(rencanaUji.id, duaProyek), { ok: true });
-  assert.equal((await getPlanDetail(rencanaUji.id))!.projects.length, 2);
+  /* --- Luaran rencana ------------------------------------------------------ */
 
-  assert.deepEqual(await setPlanProjects(rencanaUji.id, [duaProyek[0]]), { ok: true });
+  // Luaran non-proyek tidak perlu proyek sama sekali.
+  const jurnal = await createPlanOutput(rencanaUji.id, {
+    kind: "Jurnal",
+    title: "Estimasi uji",
+    projectId: null,
+    url: "https://doi.org/uji",
+    achievedAt: null,
+    note: "",
+  });
+  assert.equal(jurnal.ok, true);
+
+  // Proyek turunan boleh menunjuk proyek nyata.
+  const proyekAda = semua[0].id;
+  const turunan = await createPlanOutput(rencanaUji.id, {
+    kind: "Proyek Turunan",
+    title: semua[0].name,
+    projectId: proyekAda,
+    url: "",
+    achievedAt: null,
+    note: "",
+  });
+  assert.equal(turunan.ok, true);
+
   const detailRencana = (await getPlanDetail(rencanaUji.id))!;
-  assert.equal(detailRencana.projects.length, 1, "daftar diganti, bukan ditambahkan");
-  assert.equal(detailRencana.projects[0].id, duaProyek[0]);
+  assert.equal(detailRencana.outputs.length, 2);
+  // getPlanDetail melengkapi proyeknya, bukan sekadar menyimpan idnya.
+  assert.equal(
+    detailRencana.outputs.find((o) => o.kind === "Proyek Turunan")!.project!.id,
+    proyekAda
+  );
+  assert.equal(detailRencana.outputs.find((o) => o.kind === "Jurnal")!.project, null);
 
-  // Proyek yang tidak ada ditolak, dan kaitan lama tidak ikut hilang karenanya.
-  const tolakan = await setPlanProjects(rencanaUji.id, [999_999]);
-  assert.equal(tolakan.ok, false);
-  assert.equal((await getPlanDetail(rencanaUji.id))!.projects.length, 1);
-  assert.equal((await setPlanProjects(999_999, [])).ok, false);
+  // Nomor urut ditentukan server, bukan dikirim klien.
+  assert.deepEqual(detailRencana.outputs.map((o) => o.sortOrder), [0, 1]);
+
+  // Proyek yang tidak ada ditolak — kaitan salah ketik tidak boleh hilang diam-diam.
+  const hantuProyek = await createPlanOutput(rencanaUji.id, {
+    kind: "Proyek Turunan",
+    title: "Tidak ada",
+    projectId: 999_999,
+    url: "",
+    achievedAt: null,
+    note: "",
+  });
+  assert.equal(hantuProyek.ok, false);
+
+  // Proyek hanya bermakna untuk "Proyek Turunan"; jenis lain menolaknya.
+  const salahJenis = await createPlanOutput(rencanaUji.id, {
+    kind: "Jurnal",
+    title: "Jurnal berproyek",
+    projectId: proyekAda,
+    url: "",
+    achievedAt: null,
+    note: "",
+  });
+  assert.equal(salahJenis.ok, false);
+
+  // Rencana yang tidak ada ditolak.
+  assert.equal(
+    (
+      await createPlanOutput(999_999, {
+        kind: "Jurnal",
+        title: "Ke mana ini",
+        projectId: null,
+        url: "",
+        achievedAt: null,
+        note: "",
+      })
+    ).ok,
+    false
+  );
+
+  // Perbarui, lalu hapus.
+  const idJurnal = detailRencana.outputs.find((o) => o.kind === "Jurnal")!.id;
+  assert.equal(
+    (
+      await updatePlanOutput(idJurnal, {
+        kind: "Jurnal",
+        title: "Judul diperbaiki",
+        projectId: null,
+        url: "",
+        achievedAt: "2026-10-01",
+        note: "",
+        sortOrder: 0,
+      })
+    ).ok,
+    true
+  );
+  assert.equal(
+    (await getPlanDetail(rencanaUji.id))!.outputs.find((o) => o.id === idJurnal)!.title,
+    "Judul diperbaiki"
+  );
+  assert.equal(await deletePlanOutput(idJurnal), true);
+  assert.equal(await deletePlanOutput(idJurnal), false); // klik ganda tidak melapor sukses palsu
+  assert.equal((await getPlanDetail(rencanaUji.id))!.outputs.length, 1);
 
   // getPlanDetail melengkapi: nama PIC langkah, dan langkah tanpa PIC tetap null.
   assert.equal(detailRencana.steps.find((s) => s.id === langkah1.id)!.owner!.id, users[0].id);

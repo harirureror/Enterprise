@@ -1,12 +1,14 @@
 import { tanggalNyata } from "./project-form";
 import {
   PLAN_GOALS,
+  PLAN_OUTPUT_KINDS,
   PLAN_KINDS,
   PLAN_SEGMENTS,
   PLAN_STATUSES,
   PROJECT_PRIORITIES,
   PROSPECT_STATUSES,
   STEP_STATUSES,
+  type PlanOutput,
   type PlanProspect,
   type PlanStep,
   type StrategicPlan,
@@ -300,5 +302,102 @@ export function draftToProspect(
     status: draft.status as PlanProspect["status"],
     note: draft.note.trim(),
     updatedAt: new Date().toISOString().slice(0, 10),
+  };
+}
+
+/* --- Luaran ------------------------------------------------------------------
+
+   Apa yang dihasilkan sebuah rencana. Proyek salah satu jenisnya, bukan
+   kategori tersendiri — riset juga melahirkan jurnal, dan pelatihan
+   melahirkan portofolio. */
+
+export type OutputDraft = {
+  kind: string;
+  title: string;
+  /** "" berarti tidak ditautkan ke proyek mana pun. */
+  projectId: string;
+  url: string;
+  achievedAt: string;
+  note: string;
+};
+
+export type OutputField = keyof OutputDraft;
+export type OutputErrors = Partial<Record<OutputField, string>>;
+
+export const OUTPUT_TITLE_MAX = 160;
+export const URL_MAX = 500;
+
+export function emptyOutputDraft(): OutputDraft {
+  return { kind: "Jurnal", title: "", projectId: "", url: "", achievedAt: "", note: "" };
+}
+
+export function outputToDraft(o: PlanOutput): OutputDraft {
+  return {
+    kind: o.kind,
+    title: o.title,
+    projectId: o.projectId === null ? "" : String(o.projectId),
+    url: o.url,
+    achievedAt: o.achievedAt ?? "",
+    note: o.note,
+  };
+}
+
+export function validateOutput(draft: OutputDraft): OutputErrors {
+  const errors: OutputErrors = {};
+
+  if (!(PLAN_OUTPUT_KINDS as string[]).includes(draft.kind)) {
+    errors.kind = "Jenis luaran tidak dikenal.";
+  }
+
+  const title = draft.title.trim();
+  if (title === "") errors.title = "Judul luaran wajib diisi.";
+  else if (title.length > OUTPUT_TITLE_MAX) {
+    errors.title = `Judul maksimal ${OUTPUT_TITLE_MAX} karakter.`;
+  }
+
+  // Proyek hanya bermakna untuk "Proyek Turunan"; menempelkannya di jenis lain
+  // membuat daftar luaran menyesatkan. Aturan yang sama dijaga lib/api.ts.
+  if (draft.projectId.trim() !== "" && draft.kind !== "Proyek Turunan") {
+    errors.projectId = 'Hanya "Proyek Turunan" yang bisa ditautkan ke proyek.';
+  }
+
+  const url = draft.url.trim();
+  if (url !== "") {
+    if (url.length > URL_MAX) errors.url = `Tautan maksimal ${URL_MAX} karakter.`;
+    else {
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(url);
+      } catch {
+        parsed = null;
+      }
+      // Skema lain (javascript:, data:) tidak pantas jadi tautan yang diklik
+      // orang lain — alasan yang sama dengan URL foto di lib/profile-form.ts.
+      if (!parsed) errors.url = "Tautan tidak valid.";
+      else if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        errors.url = "Tautan harus diawali http:// atau https://";
+      }
+    }
+  }
+
+  if (draft.achievedAt !== "" && !tanggalNyata(draft.achievedAt)) {
+    errors.achievedAt = "Tanggal tidak valid.";
+  }
+
+  if (draft.note.trim().length > NOTE_MAX) {
+    errors.note = `Catatan maksimal ${NOTE_MAX} karakter.`;
+  }
+
+  return errors;
+}
+
+export function draftToOutput(draft: OutputDraft): Omit<PlanOutput, "id" | "planId" | "sortOrder"> {
+  return {
+    kind: draft.kind as PlanOutput["kind"],
+    title: draft.title.trim(),
+    projectId: draft.projectId.trim() === "" ? null : Number(draft.projectId),
+    url: draft.url.trim(),
+    achievedAt: draft.achievedAt === "" ? null : draft.achievedAt,
+    note: draft.note.trim(),
   };
 }

@@ -28,7 +28,7 @@ import {
 import { datasetToWord } from "./export/word";
 import {
   agenda as mockAgenda,
-  planProjects as mockPlanProjects,
+  planOutputs as mockPlanOutputs,
   planProspects as mockPlanProspects,
   planSteps as mockPlanSteps,
   projects as mockProjects,
@@ -458,7 +458,7 @@ async function main() {
     steps: mockPlanSteps,
     prospects: mockPlanProspects,
     projects: mockProjects,
-    planProjects: mockPlanProjects,
+    planOutputs: mockPlanOutputs,
     users: mockUsers,
     tanggal: ACUAN,
   };
@@ -466,10 +466,10 @@ async function main() {
   // Excel: keempat lembar benar-benar ada, dengan nama yang dijanjikan.
   const rencanaExcel = isiZip(await berkasRencana({ ...argRencana, format: "excel" }));
   const namaLembar = teksDari(rencanaExcel, /workbook\.xml$/);
-  for (const nama of ["Rencana", "Langkah", "Prospek", "Jangkauan"]) {
+  for (const nama of ["Rencana", "Langkah", "Prospek", "Luaran", "Jangkauan"]) {
     assert.ok(namaLembar.includes(nameSheet(nama)), `lembar ${nama} harus ada`);
   }
-  assert.ok(rencanaExcel["xl/worksheets/sheet4.xml"], "empat lembar, bukan tiga");
+  assert.ok(rencanaExcel["xl/worksheets/sheet5.xml"], "lima lembar: Rencana, Langkah, Prospek, Luaran, Jangkauan");
 
   // Isinya benar-benar terbawa, bukan sekadar kerangka lembar.
   const teksExcel = teksDari(rencanaExcel, /sharedStrings\.xml$|xl\/worksheets\//);
@@ -485,6 +485,8 @@ async function main() {
   assert.ok(rencanaWord.includes("Prospek"));
   assert.ok(rencanaWord.includes("Susun silabus"), "judul langkah ikut tercetak");
   assert.ok(rencanaWord.includes("Kaltim Prima"), "calon klien ikut tercetak");
+  assert.ok(rencanaWord.includes("Estimasi carbon stock"), "luaran jurnal ikut tercetak");
+  assert.ok(rencanaWord.includes("Jurnal"), "jenis luaran ikut tercetak");
 
   // PDF benar-benar bisa dimuat ulang, bukan hanya berukuran besar.
   const rencanaPdf = await PDFDocument.load(
@@ -508,7 +510,7 @@ async function main() {
     steps: [],
     prospects: [],
     projects: [],
-    planProjects: [],
+    planOutputs: [],
     users: [],
     tanggal: ACUAN,
   };
