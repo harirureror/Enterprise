@@ -162,15 +162,15 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             </div>
           )}
 
-          {/* Form ini kini jalur manual saja. Membiarkannya tetap muncul pada
-              proyek otomatis akan menawarkan angka yang langsung ditimpa
-              perhitungan checklist begitu ada yang dicentang. */}
-          {bolehUbah && project.progressMode === "manual" && (
+          {/* Angkanya datang dari checklist; yang bisa ditambahkan orang di sini
+              hanya ceritanya. Menyediakan isian persen di samping angka yang
+              dihitung berarti menawarkan dua kebenaran untuk satu hal. */}
+          {bolehUbah && (
             <div className="mt-5 border-t border-border pt-4">
-              <h3 className="text-sm font-medium">Catat progres</h3>
+              <h3 className="text-sm font-medium">Catat perkembangan</h3>
               <p className="mt-0.5 text-xs text-muted">
-                Proyek ini memakai progres manual. Setiap pembaruan tersimpan di riwayat
-                sebagai jejak audit.
+                Progres dihitung dari checklist aktivitas. Catatan di sini tersimpan di
+                riwayat sebagai jejak audit, bersama angka yang berlaku saat itu.
               </p>
               <div className="mt-3">
                 <ProgressForm projectId={project.id} current={project.progressPct} />
@@ -523,7 +523,7 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
           projectId={project.id}
           typeCode={project.type}
           activities={activities}
-          progressMode={project.progressMode}
+          statusOverride={project.statusOverride}
           adaTemplate={adaTemplate}
           bolehUbah={bolehUbah}
           hariIni={hariIni}

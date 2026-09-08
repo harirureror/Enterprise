@@ -334,12 +334,11 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
         p.updatedAt
       );
     }
-    /* Checklist aktivitas untuk proyek contoh, memakai aturan yang sama persis
-       dengan migrasi 17: salin template jenisnya, tandai selesai aktivitas
-       sampai tahap statusnya, dan kunci progresnya ke manual. Angka progres
-       dari mock-data tetap yang berlaku sampai seseorang memeriksa checklist
-       itu dan menyalakan mode otomatis — checklist hasil terkaan tidak boleh
-       diam-diam menimpa angka yang ditulis orang. */
+    /* Checklist aktivitas untuk proyek contoh: salin template jenisnya, tandai
+       selesai aktivitas sampai tahap statusnya, lalu bagikan tanggalnya.
+       Progres proyek contoh diturunkan dari checklist ini di langkah terakhir —
+       sejak progres sepenuhnya otomatis, angka di mock-data hanya jadi nilai
+       awal sebelum aktivitasnya ada. */
     db.exec(`
       -- Dikosongkan dulu supaya --force tidak menumpuk salinan: baris di sini
       -- tidak punya id tetap dari mock-data, jadi ON CONFLICT tidak menolong.
@@ -347,26 +346,44 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
 
       INSERT INTO project_activities
         (project_id, name, weight, status, sla_days, target_date, done_date, sort_order)
-      SELECT
-        p.id, t.name, t.weight, t.status, t.sla_days, NULL,
-        CASE
-          WHEN (CASE t.status
-                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
-                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
-                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
-             <=
-               (CASE p.status
-                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
-                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
-                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
-          THEN p.start_date
-          ELSE NULL
-        END,
-        t.sort_order
+      SELECT p.id, t.name, t.weight, t.status, t.sla_days, NULL, NULL, t.sort_order
       FROM projects p
       JOIN activity_templates t ON t.type_code = p.type;
 
-      UPDATE projects SET progress_mode = 'manual';
+      -- Tandai selesai AWALAN checklist yang jumlah bobotnya paling dekat dengan
+      -- angka progres di mock-data, di antara awalan yang aktivitas terakhirnya
+      -- berstatus sama dengan status proyek. Aturannya sama persis dengan
+      -- migrasi 19, supaya pemasangan baru dan database lama menceritakan hal
+      -- yang sama. Menandai seluruh tahap seperti versi sebelumnya membuat
+      -- proyek "Berjalan" langsung terlihat 85% padahal contohnya menyebut 20%.
+      WITH r AS (
+        SELECT
+          a.id, a.project_id, a.sort_order, a.status,
+          p.status AS status_proyek, p.progress_pct,
+          SUM(a.weight) OVER (PARTITION BY a.project_id) AS total,
+          SUM(a.weight) OVER (
+            PARTITION BY a.project_id ORDER BY a.sort_order, a.id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS sampai
+        FROM project_activities a
+        JOIN projects p ON p.id = a.project_id
+      ),
+      kandidat AS (
+        SELECT
+          project_id, sort_order, id,
+          ROW_NUMBER() OVER (
+            PARTITION BY project_id
+            ORDER BY ABS(ROUND(sampai * 100.0 / total) - progress_pct), sort_order, id
+          ) AS peringkat
+        FROM r
+        WHERE status = status_proyek AND total > 0
+      ),
+      batas AS (SELECT project_id, sort_order, id FROM kandidat WHERE peringkat = 1)
+      UPDATE project_activities SET
+        done_date = (SELECT p.start_date FROM projects p WHERE p.id = project_activities.project_id)
+      WHERE (project_activities.sort_order, project_activities.id) <=
+            (SELECT b.sort_order, b.id FROM batas b
+             WHERE b.project_id = project_activities.project_id);
 
       -- Bagikan rentang kontrak ke aktivitasnya, aturannya sama dengan migrasi
       -- 18. Tanpa ini pemasangan baru lahir dengan tabel kurva S yang kosong,
@@ -398,6 +415,18 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
           FROM k WHERE k.id = project_activities.id
         )
       WHERE id IN (SELECT id FROM k);
+
+      -- Progres proyek contoh diturunkan dari checklist-nya, bukan dari angka
+      -- di mock-data. Sejak progres sepenuhnya otomatis, dua sumber untuk hal
+      -- yang sama pasti berselisih begitu ada satu centang berubah.
+      UPDATE projects SET progress_pct = (
+        SELECT CAST(ROUND(
+          SUM(CASE WHEN a.done_date IS NOT NULL THEN a.weight ELSE 0 END) * 100.0
+          / NULLIF(SUM(a.weight), 0)
+        ) AS INTEGER)
+        FROM project_activities a WHERE a.project_id = projects.id
+      )
+      WHERE EXISTS (SELECT 1 FROM project_activities a WHERE a.project_id = projects.id);
     `);
 
     // Riwayat paling akhir: menunjuk ke projects dan users sekaligus.

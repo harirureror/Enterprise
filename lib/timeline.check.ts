@@ -27,7 +27,7 @@ function p(id: number, startDate: string, deadline: string, ownerId = 1): Projec
     status: "Berjalan",
     priority: "Sedang",
     priorityMode: "auto",
-    progressMode: "auto",
+    statusOverride: null,
     progressPct: 0,
     clientOrg: "PT Uji",
     locationCity: "",

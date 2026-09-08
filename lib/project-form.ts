@@ -278,7 +278,7 @@ export function draftToProject(draft: ProjectDraft): Omit<Project, "id"> {
     // Proyek baru selalu "auto": checklist yang menghitung progresnya. Yang
     // mengunci ke manual adalah tindakan sadar di halaman detail, bukan
     // bawaan formulir pembuatan.
-    progressMode: "auto",
+    statusOverride: null,
     progressPct: Number(draft.progressPct),
     clientOrg: draft.clientOrg.trim(),
     locationCity: draft.locationCity.trim(),

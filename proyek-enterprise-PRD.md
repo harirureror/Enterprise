@@ -642,18 +642,62 @@ Kolom `projects.status` **tetap ada dan tetap dipakai** seluruh penyaring, ekspo
 notifikasi, dan skor prioritas (§3a, parameter "Tahap Pipeline" hasil kesepakatan tim).
 Yang berubah hanya siapa yang mengisinya.
 
-### `progress_mode`: auto atau manual
+### Progres sepenuhnya otomatis
 
-Meniru `priority_mode` yang sudah ada. `auto` berarti progres dan status dihitung dari
-checklist; `manual` berarti keduanya dikunci ke angka yang ditulis orang lewat form
-"Catat progres" — yang kini hanya muncul pada proyek `manual`, karena menawarkan isian
-yang akan langsung ditimpa perhitungan itu menyesatkan.
+Tidak ada lagi jalan mengetik angka progres. `progress_mode` dilepas di migrasi 19,
+form "Catat progres" jadi **form catatan saja**, dan `PATCH /api/projects/{id}/progress`
+**mengabaikan** `progressPct` yang dikirim — bukan menolaknya dengan galat, karena
+menolak akan mematahkan pemanggil lama tanpa perlu; yang tercatat tetap angka yang
+berlaku.
 
-**Seluruh proyek yang sudah ada masuk sebagai `manual`.** Checklist mereka diisi
-otomatis dari statusnya saat migrasi, dan tebakan itu tidak boleh diam-diam menimpa
-angka yang ditulis orang. Menekan "Hitung dari checklist" langsung menghitung ulang —
-membiarkan angka lama bertahan sesudah kuncinya dilepas akan menampilkan progres yang
-tidak dijamin siapa pun.
+Menyediakan kotak persen di samping angka yang dihitung berarti menawarkan dua
+kebenaran untuk satu hal, dan yang diketik akan langsung ditimpa centang berikutnya.
+Yang tersisa di form adalah **ceritanya** — dan cerita memang tidak bisa diturunkan
+dari mana pun.
+
+Proyek baru **tidak pernah lahir kosong**: `createProject` langsung memasang checklist
+dari template jenisnya berikut tanggalnya. Tanpa itu, proyek tanpa checklist berarti
+proyek yang selamanya 0%, dan daftar kosong yang harus diisi tangan satu per satu
+tidak akan pernah diisi siapa pun.
+
+### Rekonsiliasi: rapikan dulu, baru lepas
+
+Checklist ke-17 proyek lama diisi migrasi 17 dengan menandai selesai **semua**
+aktivitas sampai tahap statusnya. Itu tebakan, dan tebakan itu hampir selalu lebih
+tinggi daripada angka yang ditulis orang.
+
+Migrasi 19 merapikannya lebih dulu: di antara semua **awalan** checklist yang
+aktivitas terakhirnya berstatus sama dengan status proyek, dipilih yang jumlah
+bobotnya **paling dekat** dengan angka tersimpan. Kebebasannya nyata — alur Jasa punya
+tiga aktivitas "Berjalan", jadi progres bisa 45%, 60%, atau 70% tanpa menggeser
+statusnya sedikit pun. Status diperlakukan sebagai data keras: ia disepakati orang,
+jadi progres yang menyesuaikan.
+
+Hasilnya memangkas simpangan total dari **483 poin ke 417 poin**, dan seluruh
+perbaikan itu datang dari tiga proyek yang memang punya angka. **Empat belas proyek
+sisanya tersimpan di 0%** — angka yang tidak pernah diisi siapa pun — sehingga tidak
+ada awalan checklist yang bisa mendekatinya tanpa mengingkari statusnya. Proyek yang
+sudah mengirim penawaran memang bukan 0%.
+
+`npx tsx lib/db/rekonsiliasi-progres.ts` menampilkan tabel perbandingannya. Alat itu
+**hanya membaca**; penulisannya ada di migrasi, karena langkah manual yang harus
+diingat orang akan terlewat persis pada deploy yang membutuhkannya — itu sudah pernah
+terjadi di proyek ini (§8a). Dijalankan lagi sesudah migrasi, ia melaporkan "0
+bergeser": migrasinya mencapai titik tetapnya sendiri.
+
+### Satu pengecualian: `status_override`
+
+"Tertunda" bukan hasil pekerjaan. Memarkir proyek bukan langkah yang diselesaikan,
+jadi tidak ada aktivitas yang bisa menurunkannya — dan tanpa jalan keluar, otomatisasi
+penuh berarti keadaan itu tidak bisa dinyatakan sama sekali.
+
+`projects.status_override` menampung status yang dipatok orang. Selama terisi ia
+menang atas hasil hitungan checklist; dikosongkan, proyek langsung kembali mengikuti
+checklist-nya. **Progres tetap bergerak** saat dipatok — memarkir proyek tidak
+membekukan pekerjaan yang sudah selesai.
+
+Migrasi 19 mengisinya otomatis untuk proyek yang statusnya tidak diwakili satu pun
+aktivitas, sebelum checklist sempat mengambil alih dan menghilangkan statusnya.
 
 ### Template per jenis proyek
 
@@ -741,11 +785,13 @@ pengingat lain ikut kehilangan artinya.
 
 | Yang dibuktikan | Caranya |
 |---|---|
-| Migrasi idempoten, 17 proyek utuh | Dijalankan dua kali di atas salinan database sungguhan; jumlah baris dan seluruh `progress_pct` sama persis |
-| Mode manual menahan | `lib/api.check.ts`: mencentang di proyek `manual` tidak menggeser angka maupun menambah baris riwayat |
+| Migrasi idempoten, 17 proyek utuh | Dijalankan dua kali di atas salinan database sungguhan; jumlah barisnya sama persis dan **nol status berubah** |
+| Progres tidak bisa lagi ditulis tangan | `PATCH /api/projects/1/progress` dengan `progressPct: 99` menjawab 201, tapi angka di database tetap 65 dan baris riwayatnya juga tercatat 65 |
+| Status yang dipatok menang, progres tetap jalan | Dipatok "Tertunda" lalu satu aktivitas dicentang: status tetap Tertunda, progres 65% → 85%. Patokan dilepas: status langsung kembali ke "Berjalan" |
+| Proyek baru tidak lahir kosong | `lib/api.check.ts`: checklist terpasang saat proyek dibuat, berikut tanggalnya, belum ada yang tercentang, progres 0% |
 | Centang menggerakkan tiga hal sekaligus | `lib/api.check.ts`: progres bertambah persis sebesar bobotnya, status berpindah, satu baris `progress_history` tercatat |
 | Pengingat menyala **dan padam** | `lib/notifications.check.ts`: menyala saat tenggat lewat, hilang begitu aktivitas berikutnya dicentang |
-| Penegakan di server | Sebagai Anggota, mencentang aktivitas proyek milik orang lain lewat `Next-Action` langsung → ditolak, dan di database `progress_pct` tidak bergeser, `done_date` tetap kosong, riwayat tetap nol. Kontrol positif pada proyeknya sendiri: 0% → 30%, status Penawaran → Negosiasi |
+| Penegakan di server | Sebagai Anggota, mencentang aktivitas **dan mematok status** proyek milik orang lain lewat `Next-Action` langsung → keduanya ditolak, dan di database tidak ada satu angka pun yang bergeser. Kontrol positif pada proyeknya sendiri: 0% → 30%, status Penawaran → Negosiasi |
 
 ---
 
@@ -902,7 +948,7 @@ erDiagram
         string priority
         int progress_pct
         string priority_mode
-        string progress_mode
+        string status_override
         string client_org
         string client_name
         string client_email
@@ -1059,11 +1105,14 @@ erDiagram
 - `tax_type` default `Non PKP` — satu-satunya default yang tidak mengubah angka apa pun. Menebak `PKP` akan memotong sekitar 9,9% dari margin setiap proyek lama tanpa pernah diperiksa orang.  
 - `sales_fee` dan `operational_cost` boleh `NULL` (belum diisi), berbeda dari `0` (memang tidak ada biayanya).  
 - **Margin/profit tidak dikolomkan.** Ia turunan dari `value`, `tax_type`, `sales_fee`, dan `operational_cost`, dihitung di `lib/finance.ts`: untuk PKP, PPN dikeluarkan dulu (`value ÷ 1,11`) karena PPN adalah titipan negara, bukan pendapatan. Menyimpannya berarti ada dua sumber kebenaran yang akan berselisih begitu salah satu komponennya diubah.  
-- Kolom `progress_mode` bernilai `auto` (default) atau `manual`, meniru bentuk
-  `priority_mode`. Pada `auto`, `progress_pct` dan `status` diisi hasil perhitungan
-  `PROJECT_ACTIVITIES`; pada `manual`, keduanya tidak pernah ditimpa sistem. Migrasi
-  yang memperkenalkan kolom ini menyetel **seluruh baris lama ke `manual`** — checklist
-  hasil terkaan tidak boleh diam-diam menimpa angka yang ditulis orang. Lihat §3g.  
+- **`progress_pct` tidak lagi bisa diisi orang.** Ia selalu hasil perhitungan
+  `PROJECT_ACTIVITIES`, ditulis ulang setiap kali ada centang berubah. Kolomnya tetap
+  ada — seluruh penyaring, ekspor, dan skor prioritas membacanya — yang hilang hanya
+  jalan menulisinya. `progress_mode` dilepas di migrasi 19; lihat §3g.  
+- Kolom `status_override` menampung status yang **dipatok orang** dan menang atas hasil
+  hitungan checklist selama terisi. Ada karena keadaan seperti "Tertunda" memang bukan
+  hasil pekerjaan: memarkir proyek bukan langkah yang diselesaikan, jadi tidak ada
+  aktivitas yang bisa menurunkannya. Progres tetap bergerak saat status dipatok.  
 - `ACTIVITY_TEMPLATES.type_code` dijaga `CHECK`, bukan `FOREIGN KEY` ke `project_types`,
   dengan alasan yang sama seperti `projects.type`: keempat jenis itu tetap dan
   penegakannya sudah di sana. `FOREIGN KEY` juga akan mengikat migrasinya pada urutan

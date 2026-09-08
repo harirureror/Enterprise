@@ -118,7 +118,8 @@ assert.deepEqual(kolom, [
   "location_city",
   "location_province",
   // Kunci progres manual, migrasi 17 — meniru priority_mode.
-  "progress_mode",
+  // Patokan status, migrasi 19 — pengganti progress_mode yang dilepas.
+  "status_override",
 ]);
 
 // Seed memasukkan seluruh data awal.
@@ -144,10 +145,12 @@ assert.equal(hitung("SELECT COUNT(*) AS n FROM projects"), mockProjects.length);
 seed(db);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM projects"), mockProjects.length);
 
-// Nilai yang tersimpan sama persis dengan mock-data.
+// Nilai yang tersimpan sama persis dengan mock-data — kecuali progres, yang
+// sejak migrasi 19 SELALU diturunkan dari checklist. Angka di mock-data cuma
+// nilai awal sebelum aktivitasnya ada, dan mengunci keduanya agar sama akan
+// mengunci hal yang memang sengaja berhenti jadi masukan.
 const p1 = db.prepare("SELECT * FROM projects WHERE id = 1").get()!;
 assert.equal(p1.name, mockProjects[0].name);
-assert.equal(p1.progress_pct, mockProjects[0].progressPct);
 assert.equal(p1.start_date, mockProjects[0].startDate);
 assert.equal(p1.owner_id, mockProjects[0].ownerId);
 assert.equal(p1.client_org, mockProjects[0].clientOrg);
@@ -1184,9 +1187,24 @@ assert.ok(indeksRencana.includes("idx_plan_outputs_project"));
 
 /* --- Checklist aktivitas dan kurva S ---------------------------------------- */
 
-// Seluruh proyek contoh masuk terkunci manual: checklist hasil terkaan tidak
-// boleh diam-diam menimpa angka progres yang ditulis orang.
-assert.equal(hitung("SELECT COUNT(*) AS n FROM projects WHERE progress_mode <> 'manual'"), 0);
+// Progres sepenuhnya otomatis: angka tersimpan harus sama persis dengan hasil
+// hitungan checklist-nya. Satu baris yang meleset berarti ada jalan lain yang
+// masih bisa menulisinya.
+assert.equal(
+  hitung(`SELECT COUNT(*) AS n FROM projects p WHERE EXISTS
+            (SELECT 1 FROM project_activities a WHERE a.project_id = p.id)
+          AND p.progress_pct <> (
+            SELECT CAST(ROUND(
+              SUM(CASE WHEN a.done_date IS NOT NULL THEN a.weight ELSE 0 END) * 100.0
+              / NULLIF(SUM(a.weight), 0)) AS INTEGER)
+            FROM project_activities a WHERE a.project_id = p.id)`),
+  0,
+  "progres tersimpan harus sama dengan hitungan checklist"
+);
+
+// Tidak ada proyek contoh yang statusnya dipatok — patokan itu pengecualian,
+// bukan keadaan bawaan.
+assert.equal(hitung("SELECT COUNT(*) AS n FROM projects WHERE status_override IS NOT NULL"), 0);
 
 // Template terisi untuk keempat jenis, dan bobot tiap jenis berjumlah 100 —
 // daftar yang tidak genap akan membuat proyek baru mentok di bawah 100%.
@@ -1271,10 +1289,10 @@ assert.throws(
   () =>
     db.exec(
       `INSERT INTO projects (name, type, status, priority, progress_pct, start_date, deadline,
-                             owner_id, progress_mode)
-       VALUES ('Mode asing', 'Jasa', 'Berjalan', 'Sedang', 0, '2026-01-01', '2026-02-01', 1, 'otomatis')`
+                             owner_id, status_override)
+       VALUES ('Patokan asing', 'Jasa', 'Berjalan', 'Sedang', 0, '2026-01-01', '2026-02-01', 1, 'Ditunda')`
     ),
-  "progress_mode di luar auto/manual harus ditolak"
+  "status_override di luar daftar status harus ditolak"
 );
 
 // Menghapus proyek membawa serta checklistnya — tidak ada aktivitas menggantung.

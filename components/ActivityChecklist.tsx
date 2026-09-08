@@ -9,7 +9,7 @@ import {
   pakaiTemplateAktivitas,
   perbaruiAktivitas,
   simpanAktivitas,
-  ubahModeProgres,
+  patokStatus,
 } from "@/lib/activity-actions";
 import { tindakLanjutTerlewat, totalBobot } from "@/lib/activities";
 import {
@@ -18,19 +18,18 @@ import {
   activityToDraft,
   emptyActivityDraft,
 } from "@/lib/activity-form";
-import {
-  PROJECT_STATUSES,
-  type ProgressMode,
-  type ProjectActivity,
-} from "@/lib/types";
+import { PROJECT_STATUSES, type ProjectActivity, type ProjectStatus } from "@/lib/types";
 import { formatDate, statusClass } from "@/lib/ui";
 
 /* Checklist aktivitas proyek.
 
-   Inilah yang menggerakkan progres dan status: tidak ada lagi angka persen
-   yang diketik orang, kecuali proyek sengaja dikunci ke mode manual. Karena
-   itu tiap centang punya akibat yang terlihat langsung — progres, status, dan
-   satu baris riwayat — dan teksnya menyebut akibat itu apa adanya. */
+   Inilah satu-satunya yang menggerakkan progres dan status: tidak ada lagi
+   angka persen yang bisa diketik dari mana pun. Karena itu tiap centang punya
+   akibat yang terlihat langsung — progres, status, dan satu baris riwayat —
+   dan teksnya menyebut akibat itu apa adanya.
+
+   Pengecualiannya satu: status yang dipatok orang. "Tertunda" bukan hasil
+   pekerjaan, jadi tidak ada aktivitas yang bisa menurunkannya. */
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
@@ -39,7 +38,7 @@ export default function ActivityChecklist({
   projectId,
   typeCode,
   activities,
-  progressMode,
+  statusOverride,
   adaTemplate,
   bolehUbah,
   hariIni,
@@ -48,7 +47,8 @@ export default function ActivityChecklist({
   /** Jenis proyek, untuk menyebut template mana yang akan dipakai. */
   typeCode: string;
   activities: ProjectActivity[];
-  progressMode: ProgressMode;
+  /** Status yang dipatok orang; `null` berarti mengikuti checklist. */
+  statusOverride: ProjectStatus | null;
   adaTemplate: boolean;
   bolehUbah: boolean;
   /** Tanggal acuan dari server, supaya tidak bergeser karena zona waktu. */
@@ -98,9 +98,10 @@ export default function ActivityChecklist({
             Checklist Aktivitas
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            {progressMode === "auto"
-              ? "Mencentang aktivitas langsung menggerakkan progres dan status proyek, dan tercatat di riwayat."
-              : "Proyek ini dikunci ke progres manual, jadi mencentang aktivitas tidak mengubah angkanya."}
+            Mencentang aktivitas langsung menggerakkan progres dan status proyek, dan
+            tercatat di riwayat.
+            {statusOverride !== null &&
+              ` Status dipatok "${statusOverride}", jadi centang hanya menggerakkan progresnya.`}
           </p>
         </div>
         {bolehUbah && (
@@ -109,13 +110,11 @@ export default function ActivityChecklist({
               type="button"
               disabled={pending}
               onClick={() =>
-                jalankan(() =>
-                  ubahModeProgres(projectId, progressMode === "auto" ? "manual" : "auto")
-                )
+                jalankan(() => patokStatus(projectId, statusOverride === null ? "Tertunda" : null))
               }
               className="rounded-lg border border-border px-2.5 py-1 text-sm text-muted hover:bg-background"
             >
-              {progressMode === "auto" ? "Kunci ke angka manual" : "Hitung dari checklist"}
+              {statusOverride === null ? "Tandai ditunda" : "Lepas patokan status"}
             </button>
             <button
               type="button"

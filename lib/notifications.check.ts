@@ -22,7 +22,7 @@ function p(id: number, over: Partial<Project> = {}): Project {
     status: "Berjalan",
     priority: "Sedang",
     priorityMode: "auto",
-    progressMode: "auto",
+    statusOverride: null,
     progressPct: 50,
     clientOrg: "PT Uji",
     locationCity: "",

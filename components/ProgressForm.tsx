@@ -7,13 +7,19 @@ import {
   NOTE_MAX,
   type ProgressDraft,
   type ProgressErrors,
-  type ProgressField,
   emptyProgressDraft,
   validateProgress,
 } from "@/lib/progress-form";
 
-/* Form catat progres di halaman detail. Aturan validasinya sama dengan yang
-   dijalankan ulang di server action. */
+/* Form catat perkembangan di halaman detail.
+
+   Tidak ada lagi isian persen. Progres seluruhnya diturunkan dari checklist
+   aktivitas, dan menyediakan kotak angka di sampingnya berarti menawarkan dua
+   kebenaran untuk satu hal — yang diketik pun akan langsung ditimpa centang
+   berikutnya. Yang tersisa adalah ceritanya, dan cerita memang tidak bisa
+   diturunkan dari mana pun.
+
+   Aturan validasinya sama dengan yang dijalankan ulang di server action. */
 
 function inputClass(error?: string) {
   return `w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent/20 ${
@@ -26,25 +32,22 @@ export default function ProgressForm({
   current,
 }: {
   projectId: number;
-  /** Progres proyek sekarang, jadi nilai awal sekaligus pembanding. */
+  /** Progres yang berlaku — angka yang akan ikut tercatat di riwayat. */
   current: number;
 }) {
   const router = useRouter();
   const uid = useId();
-  const [draft, setDraft] = useState<ProgressDraft>(() => emptyProgressDraft(current));
+  const [draft, setDraft] = useState<ProgressDraft>(emptyProgressDraft);
   const [errors, setErrors] = useState<ProgressErrors>({});
   const [saving, setSaving] = useState(false);
   const [gagal, setGagal] = useState<string | null>(null);
   const [berhasil, setBerhasil] = useState<string | null>(null);
 
-  const nilai = Number(draft.progressPct);
-  const selisih = Number.isFinite(nilai) ? nilai - current : 0;
-
-  function set(field: ProgressField, value: string) {
-    const berikutnya = { ...draft, [field]: value };
+  function set(value: string) {
+    const berikutnya = { note: value };
     setDraft(berikutnya);
     setBerhasil(null);
-    if (Object.keys(errors).length > 0) setErrors(validateProgress(berikutnya, current));
+    if (Object.keys(errors).length > 0) setErrors(validateProgress(berikutnya));
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -52,10 +55,10 @@ export default function ProgressForm({
     setGagal(null);
     setBerhasil(null);
 
-    const temuan = validateProgress(draft, current);
+    const temuan = validateProgress(draft);
     setErrors(temuan);
     if (Object.keys(temuan).length > 0) {
-      document.getElementById(`${uid}-${Object.keys(temuan)[0]}`)?.focus();
+      document.getElementById(`${uid}-note`)?.focus();
       return;
     }
 
@@ -63,17 +66,16 @@ export default function ProgressForm({
     try {
       const hasil = await catatProgres(projectId, draft);
       if (!hasil.ok) {
-        setErrors(hasil.errors);
         setGagal(hasil.error);
+        setErrors(hasil.errors);
         return;
       }
-
-      setBerhasil("Progres tercatat.");
-      // Persentase baru jadi acuan berikutnya; catatan dikosongkan.
-      setDraft({ progressPct: draft.progressPct, note: "" });
+      setDraft(emptyProgressDraft());
+      setErrors({});
+      setBerhasil("Tersimpan di riwayat.");
       router.refresh();
     } catch {
-      setGagal("Tidak bisa menghubungi server. Coba lagi.");
+      setGagal("Gagal menyimpan catatan. Coba lagi.");
     } finally {
       setSaving(false);
     }
@@ -90,55 +92,28 @@ export default function ProgressForm({
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
-        <label className="block text-sm">
-          <span className="font-medium">Progres (%)</span>
-          <input
-            id={`${uid}-progressPct`}
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={draft.progressPct}
-            aria-invalid={errors.progressPct ? true : undefined}
-            aria-describedby={errors.progressPct ? `${uid}-progressPct-error` : undefined}
-            onChange={(e) => set("progressPct", e.target.value)}
-            className={`mt-1 ${inputClass(errors.progressPct)}`}
-          />
-          {errors.progressPct ? (
-            <p id={`${uid}-progressPct-error`} className="mt-1 text-xs text-high">
-              {errors.progressPct}
-            </p>
-          ) : (
-            <span className="mt-1 block text-xs text-muted">
-              {selisih === 0 ? `tetap ${current}%` : `${selisih > 0 ? "+" : ""}${selisih} dari ${current}%`}
-            </span>
-          )}
-        </label>
-
-        <label className="block text-sm">
-          <span className="font-medium">Catatan</span>
-          <textarea
-            id={`${uid}-note`}
-            rows={2}
-            value={draft.note}
-            aria-invalid={errors.note ? true : undefined}
-            aria-describedby={errors.note ? `${uid}-note-error` : undefined}
-            onChange={(e) => set("note", e.target.value)}
-            placeholder="Apa yang berubah sejak pembaruan terakhir?"
-            className={`mt-1 ${inputClass(errors.note)}`}
-          />
-          {errors.note ? (
-            <p id={`${uid}-note-error`} className="mt-1 text-xs text-high">
-              {errors.note}
-            </p>
-          ) : (
-            <span className="mt-1 block text-xs text-muted">
-              {draft.note.trim().length}/{NOTE_MAX} karakter
-            </span>
-          )}
-        </label>
-      </div>
+      <label className="block text-sm">
+        <span className="font-medium">Catatan</span>
+        <textarea
+          id={`${uid}-note`}
+          rows={2}
+          value={draft.note}
+          aria-invalid={errors.note ? true : undefined}
+          aria-describedby={errors.note ? `${uid}-note-error` : undefined}
+          onChange={(e) => set(e.target.value)}
+          placeholder="Apa yang berubah sejak pembaruan terakhir?"
+          className={`mt-1 ${inputClass(errors.note)}`}
+        />
+        {errors.note ? (
+          <p id={`${uid}-note-error`} className="mt-1 text-xs text-high">
+            {errors.note}
+          </p>
+        ) : (
+          <span className="mt-1 block text-xs text-muted">
+            {draft.note.trim().length}/{NOTE_MAX} karakter · tercatat pada {current}%
+          </span>
+        )}
+      </label>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -146,7 +121,7 @@ export default function ProgressForm({
           disabled={saving}
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-on-brand transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          {saving ? "Menyimpan…" : "Catat Progres"}
+          {saving ? "Menyimpan…" : "Catat"}
         </button>
         <p aria-live="polite" className="text-sm text-muted">
           {berhasil ?? ""}

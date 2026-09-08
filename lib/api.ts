@@ -9,7 +9,6 @@ import {
   type PlanComment,
   type PlanOutput,
   type PlanProspect,
-  type ProgressMode,
   type ProjectActivity,
   type PlanStep,
   type ProgressEntry,
@@ -298,8 +297,26 @@ export async function getProjectDetail(id: number): Promise<ProjectDetail | null
 }
 
 /** Simpan proyek baru. Id-nya diberikan database, bukan dihitung pemanggil. */
+/**
+ * Buat proyek, lalu langsung bekali checklist dari template jenisnya.
+ *
+ * Sejak progres sepenuhnya otomatis, proyek tanpa checklist berarti proyek yang
+ * selamanya 0% — dan daftar kosong yang harus diisi tangan satu per satu tidak
+ * akan pernah diisi siapa pun. Tanggalnya ikut dibagikan di dalam rentang
+ * kontraknya, jadi kurva S-nya tergambar sejak hari pertama.
+ */
 export async function createProject(input: Omit<Project, "id">): Promise<Project> {
-  return store.projects.insert(input);
+  const project = store.projects.insert(input);
+
+  const jumlah = store.projectActivities.copyTemplateTo(project.id, project.type, {
+    mulai: project.startDate,
+    akhir: project.deadline,
+  });
+  // Jenis yang belum punya template tetap boleh dipakai; proyeknya lahir dengan
+  // checklist kosong dan bisa diisi belakangan.
+  if (jumlah > 0) await hitungUlangProgres(project.id);
+
+  return store.projects.byId(project.id) ?? project;
 }
 
 /** Perbarui proyek yang sudah ada. `null` kalau id-nya tidak ketemu. */
@@ -1139,13 +1156,11 @@ async function hitungUlangProgres(
   const project = store.projects.byId(projectId);
   if (!project) return null;
 
-  if (project.progressMode !== "auto") {
-    return { progressPct: project.progressPct, status: project.status, berubah: false };
-  }
-
   const activities = store.projectActivities.byProject(projectId);
   const progressPct = progresDariAktivitas(activities);
-  const status = statusDariAktivitas(activities, project.status);
+  // Status yang dipatok orang menang. Aktivitas bisa menceritakan sejauh mana
+  // pekerjaannya, tapi tidak bisa tahu bahwa proyeknya sedang diparkir.
+  const status = project.statusOverride ?? statusDariAktivitas(activities, project.status);
   const berubah = progressPct !== project.progressPct || status !== project.status;
 
   if (berubah) store.projectActivities.terapkanProgres(projectId, progressPct, status);
@@ -1253,20 +1268,20 @@ export async function applyTemplateToProject(
 }
 
 /**
- * Kunci progres ke angka manual, atau kembalikan ke perhitungan checklist.
+ * Patok status proyek, atau lepaskan supaya kembali mengikuti checklist.
  *
- * Kembali ke "auto" langsung menghitung ulang: membiarkan angka lama bertahan
- * sesudah kuncinya dilepas akan menampilkan progres yang tidak dijamin siapa pun.
+ * Melepasnya langsung menghitung ulang: membiarkan status patokan bertahan
+ * sesudah kuncinya dilepas akan menampilkan tahap yang tidak dijamin siapa pun.
  */
-export async function setProgressMode(
+export async function setStatusOverride(
   projectId: number,
-  mode: ProgressMode
+  status: ProjectStatus | null
 ): Promise<Project | null> {
   const project = store.projects.byId(projectId);
   if (!project) return null;
 
-  store.projects.update(projectId, { ...project, progressMode: mode });
-  if (mode === "auto") await hitungUlangProgres(projectId);
+  store.projects.update(projectId, { ...project, statusOverride: status });
+  await hitungUlangProgres(projectId);
   return store.projects.byId(projectId);
 }
 

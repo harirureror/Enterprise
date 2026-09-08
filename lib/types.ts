@@ -227,9 +227,18 @@ export type Project = {
    */
   priority: ProjectPriority;
   priorityMode: PriorityMode;
-  /** "auto" berarti progressPct dihitung dari checklist aktivitas. */
-  progressMode: ProgressMode;
+  /**
+   * Selalu hasil hitungan checklist aktivitas. Tidak ada jalan mengetiknya —
+   * lihat `lib/activities.ts`.
+   */
   progressPct: number;
+  /**
+   * Status yang dipatok orang, mengalahkan hasil hitungan checklist selama
+   * terisi. Ada untuk keadaan yang memang bukan hasil pekerjaan — "Tertunda"
+   * tidak bisa diturunkan dari aktivitas mana pun, karena memarkir proyek
+   * bukan sebuah langkah yang diselesaikan.
+   */
+  statusOverride: ProjectStatus | null;
   /** Instansi pemberi kerja — satu-satunya kolom klien yang wajib diisi. */
   clientOrg: string;
   /** Lokasi Kota/Kabupaten klien */
@@ -288,7 +297,6 @@ export type ProjectDependency = {
 
 /** Satu baris riwayat progres — padanan tabel PROGRESS_HISTORY di PRD. */
 /** Meniru PriorityMode: dihitung sistem, kecuali sengaja dikunci. */
-export type ProgressMode = "auto" | "manual";
 
 /**
  * Satu langkah alur kerja proyek.

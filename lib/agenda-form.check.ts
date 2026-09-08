@@ -104,7 +104,7 @@ const proyek: Project[] = [
     status: "Berjalan",
     priority: "Sedang",
     priorityMode: "auto",
-    progressMode: "auto",
+    statusOverride: null,
     progressPct: 0,
     clientOrg: "PT Uji",
     locationCity: "Muara Enim",

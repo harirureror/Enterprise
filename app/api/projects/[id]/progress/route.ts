@@ -65,16 +65,15 @@ export async function PATCH(
 
   const masuk = body as Record<string, unknown>;
   const draft: ProgressDraft = {
-    progressPct:
-      masuk.progressPct === undefined || masuk.progressPct === null
-        ? ""
-        : String(masuk.progressPct),
     note: masuk.note === undefined || masuk.note === null ? "" : String(masuk.note),
   };
 
-  // Aturan yang sama dengan form di halaman detail, termasuk larangan mencatat
-  // baris kosong saat persentasenya tidak berubah.
-  const errors = validateProgress(draft, project.progressPct);
+  /* `progressPct` yang dikirim SENGAJA DIABAIKAN, bukan ditolak: progres kini
+     sepenuhnya diturunkan dari checklist aktivitas, dan satu panggilan REST
+     yang boleh menimpanya akan diam-diam membatalkan seluruh perhitungan itu.
+     Menolaknya dengan galat akan mematahkan pemanggil lama tanpa perlu; yang
+     tercatat tetap angka yang berlaku. */
+  const errors = validateProgress(draft);
   if (Object.keys(errors).length > 0) {
     return NextResponse.json({ error: "Catatan progres belum valid.", errors }, { status: 400 });
   }
@@ -87,14 +86,11 @@ export async function PATCH(
   const entry = await addProgress({
     projectId: id,
     userId: user.id,
-    progressPct: Number(draft.progressPct),
+    progressPct: project.progressPct,
     note: draft.note.trim(),
   });
 
   if (!entry) return tidakDitemukan;
 
-  return NextResponse.json(
-    { entry, progressPct: Number(draft.progressPct) },
-    { status: 201 }
-  );
+  return NextResponse.json({ entry, progressPct: project.progressPct }, { status: 201 });
 }

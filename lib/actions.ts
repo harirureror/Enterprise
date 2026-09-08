@@ -141,8 +141,9 @@ export type ProgresHasil =
   | { ok: false; error: string; errors: ProgressErrors };
 
 /**
- * Catat progres baru dari halaman detail. Pencatatnya diambil dari pengguna
- * yang sedang masuk, bukan dikirim klien.
+ * Catat perkembangan dari halaman detail. Pencatatnya diambil dari pengguna
+ * yang sedang masuk, bukan dikirim klien, dan angkanya dari progres yang
+ * berlaku — bukan dari isian, karena tidak ada lagi isian persen.
  */
 export async function catatProgres(id: number, draft: ProgressDraft): Promise<ProgresHasil> {
   const ditolak = await tolakKalauBukanHaknya(id);
@@ -153,7 +154,7 @@ export async function catatProgres(id: number, draft: ProgressDraft): Promise<Pr
     return { ok: false, error: "Proyek tidak ditemukan atau sudah dihapus.", errors: {} };
   }
 
-  const errors = validateProgress(draft, project.progressPct);
+  const errors = validateProgress(draft);
   if (Object.keys(errors).length > 0) {
     return { ok: false, error: "Catatan progres belum valid.", errors };
   }
@@ -163,10 +164,12 @@ export async function catatProgres(id: number, draft: ProgressDraft): Promise<Pr
     return { ok: false, error: "Perlu masuk untuk mencatat progres.", errors: {} };
   }
 
+  // Angkanya diambil dari progres yang berlaku, bukan dari isian: riwayat
+  // mencatat keadaan saat catatan itu ditulis.
   await addProgress({
     projectId: id,
     userId: pencatat.id,
-    progressPct: Number(draft.progressPct),
+    progressPct: project.progressPct,
     note: draft.note.trim(),
   });
 

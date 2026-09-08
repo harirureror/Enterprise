@@ -10,12 +10,13 @@ import {
   getProject,
   getProjectActivity,
   setActivityDone,
-  setProgressMode,
+  setStatusOverride,
   updateActivityTemplate,
   updateProjectActivity,
 } from "@/lib/api";
 import { getSessionUser, tolakKalauTakBoleh } from "@/lib/auth";
 import { canEditProject } from "@/lib/permissions";
+import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/types";
 import {
   type ActivityDraft,
   type ActivityErrors,
@@ -145,15 +146,25 @@ export async function pakaiTemplateAktivitas(projectId: number): Promise<Aktivit
   return { ok: true };
 }
 
-export async function ubahModeProgres(projectId: number, mode: string): Promise<AktivitasHasil> {
+/**
+ * Patok status proyek, atau lepaskan (`null`) supaya kembali mengikuti checklist.
+ *
+ * Satu-satunya jalan status disetel tangan. Ada karena keadaan seperti
+ * "Tertunda" memang bukan hasil pekerjaan: memarkir proyek bukan langkah yang
+ * diselesaikan, jadi tidak ada aktivitas yang bisa menurunkannya.
+ */
+export async function patokStatus(
+  projectId: number,
+  status: string | null
+): Promise<AktivitasHasil> {
   const ditolak = await jagaProyek(projectId);
   if (ditolak) return ditolak;
 
-  if (mode !== "auto" && mode !== "manual") {
-    return { ok: false, error: "Mode progres tidak dikenal.", errors: {} };
+  if (status !== null && !(PROJECT_STATUSES as string[]).includes(status)) {
+    return { ok: false, error: "Status proyek tidak dikenal.", errors: {} };
   }
 
-  const hasil = await setProgressMode(projectId, mode);
+  const hasil = await setStatusOverride(projectId, status as ProjectStatus | null);
   if (hasil === null) return { ok: false, error: "Proyek tidak ditemukan.", errors: {} };
 
   segarkan(projectId);

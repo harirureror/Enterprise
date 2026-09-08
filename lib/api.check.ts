@@ -15,7 +15,7 @@ import {
   getProjectActivities,
   getProjectActivity,
   setActivityDone,
-  setProgressMode,
+  setStatusOverride,
   updateActivityTemplate,
   updateProjectActivity,
   deleteAgendaEntries,
@@ -966,26 +966,32 @@ async function main() {
     [...aktivitas.map((a) => a.sortOrder)].sort((x, y) => x - y),
     "aktivitas keluar menurut urutannya"
   );
-  assert.equal(proyekAktif.progressMode, "manual", "proyek contoh masuk terkunci manual");
+  assert.equal(proyekAktif.statusOverride, null, "proyek contoh tidak dipatok statusnya");
 
-  // MODE MANUAL MENAHAN. Mencentang tetap tercatat pada aktivitasnya, tapi
-  // angka progres dan riwayatnya tidak bergeser sedikit pun.
+  // STATUS YANG DIPATOK menang atas hasil hitungan checklist, tapi progresnya
+  // tetap bergerak — memarkir proyek tidak membekukan pekerjaannya.
   const belum = aktivitas.find((a) => a.doneDate === null)!;
-  const riwayatSemula = (await getProgressHistory(proyekAktif.id)).length;
-  const dicentang = await setActivityDone(belum.id, true, 1, "2026-09-08");
-  assert.equal(dicentang.ok, true);
-  assert.equal((await getProjectActivity(belum.id))!.doneDate, "2026-09-08");
-  assert.equal((await getProject(proyekAktif.id))!.progressPct, proyekAktif.progressPct);
-  assert.equal((await getProject(proyekAktif.id))!.status, proyekAktif.status);
-  assert.equal((await getProgressHistory(proyekAktif.id)).length, riwayatSemula);
+  await setStatusOverride(proyekAktif.id, "Tertunda");
+  assert.equal((await getProject(proyekAktif.id))!.status, "Tertunda");
+  const progresSaatDipatok = (await getProject(proyekAktif.id))!.progressPct;
 
-  // Melepas centang lagi supaya bagian berikutnya berangkat dari keadaan semula.
+  await setActivityDone(belum.id, true, 1, "2026-09-08");
+  assert.equal((await getProject(proyekAktif.id))!.status, "Tertunda", "patokan bertahan");
+  assert.ok(
+    (await getProject(proyekAktif.id))!.progressPct > progresSaatDipatok,
+    "progres tetap ikut centang"
+  );
+
+  // Melepas patokan langsung mengembalikannya ke hasil hitungan checklist.
   await setActivityDone(belum.id, false, 1);
-  assert.equal((await getProjectActivity(belum.id))!.doneDate, null);
+  await setStatusOverride(proyekAktif.id, null);
+  assert.equal((await getProject(proyekAktif.id))!.statusOverride, null);
+  assert.equal(
+    (await getProject(proyekAktif.id))!.status,
+    proyekAktif.status,
+    "kembali ke status turunan"
+  );
 
-  // BERALIH KE AUTO langsung menghitung ulang: membiarkan angka lama bertahan
-  // sesudah kuncinya dilepas akan menampilkan progres yang tidak dijamin siapa pun.
-  await setProgressMode(proyekAktif.id, "auto");
   const sesudahAuto = (await getProject(proyekAktif.id))!;
   const bobotSelesai = (await getProjectActivities(proyekAktif.id))
     .filter((a) => a.doneDate !== null)
@@ -1058,7 +1064,24 @@ async function main() {
     ...proyekAktif,
     name: "Uji salin template",
   });
-  for (const a of await getProjectActivities(proyekKosong.id)) await deleteProjectActivity(a.id);
+
+  // PROYEK BARU TIDAK PERNAH LAHIR KOSONG. Sejak progres sepenuhnya otomatis,
+  // proyek tanpa checklist berarti proyek yang selamanya 0% — dan daftar kosong
+  // yang harus diisi tangan satu per satu tidak akan pernah diisi siapa pun.
+  const bawaan = await getProjectActivities(proyekKosong.id);
+  assert.equal(
+    bawaan.length,
+    (await getActivityTemplates(proyekKosong.type)).length,
+    "checklist terpasang saat proyek dibuat"
+  );
+  assert.ok(
+    bawaan.every((a) => a.startDate !== null && a.targetDate !== null),
+    "berikut tanggalnya, jadi kurva S-nya tergambar sejak hari pertama"
+  );
+  assert.ok(bawaan.every((a) => a.doneDate === null), "belum ada yang tercentang");
+  assert.equal(proyekKosong.progressPct, 0, "dan progresnya nol, bukan angka warisan");
+
+  for (const a of bawaan) await deleteProjectActivity(a.id);
   const disalin = await applyTemplateToProject(proyekKosong.id);
   assert.equal(disalin.ok, true);
   assert.equal(
@@ -1115,7 +1138,7 @@ async function main() {
     null
   );
   assert.equal((await setActivityDone(999_999, true, 1)).ok, false);
-  assert.equal(await setProgressMode(999_999, "auto"), null);
+  assert.equal(await setStatusOverride(999_999, "Tertunda"), null);
 
   console.log("ok: api");
 }

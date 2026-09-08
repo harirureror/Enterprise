@@ -838,4 +838,103 @@ export const migrations: Migration[] = [
       WHERE id IN (SELECT id FROM k);
     `,
   },
+  {
+    id: 19,
+    name: "progres-sepenuhnya-otomatis",
+    up: `
+      -- 1. RAPIKAN CHECKLIST DULU.
+      --
+      -- Migrasi 17 menandai selesai SEMUA aktivitas sampai tahap status proyek.
+      -- Itu tebakan, dan tebakan itu hampir selalu lebih tinggi daripada angka
+      -- yang ditulis orang: proyek "Berjalan" jarang sudah menuntaskan seluruh
+      -- pekerjaan tahap Berjalan.
+      --
+      -- Di antara semua AWALAN checklist yang aktivitas terakhirnya berstatus
+      -- sama dengan status proyek, dipilih yang jumlah bobotnya paling dekat
+      -- dengan angka tersimpan. Alur Jasa punya tiga aktivitas "Berjalan", jadi
+      -- kebebasannya nyata — progres bisa 45%, 60%, atau 70% tanpa menggeser
+      -- statusnya sedikit pun.
+      --
+      -- Status diperlakukan sebagai data keras: ia disepakati orang, jadi
+      -- progres yang menyesuaikan, bukan sebaliknya. Proyek yang statusnya
+      -- tidak diwakili satu pun aktivitas (mis. "Tertunda") tidak disentuh di
+      -- sini; ia ditangani langkah 4.
+      WITH r AS (
+        SELECT
+          a.id, a.project_id, a.sort_order, a.status,
+          p.status AS status_proyek, p.progress_pct, p.start_date,
+          SUM(a.weight) OVER (PARTITION BY a.project_id) AS total,
+          SUM(a.weight) OVER (
+            PARTITION BY a.project_id ORDER BY a.sort_order, a.id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+          ) AS sampai
+        FROM project_activities a
+        JOIN projects p ON p.id = a.project_id
+      ),
+      kandidat AS (
+        SELECT
+          project_id, sort_order, id,
+          ROW_NUMBER() OVER (
+            PARTITION BY project_id
+            ORDER BY ABS(ROUND(sampai * 100.0 / total) - progress_pct), sort_order, id
+          ) AS peringkat
+        FROM r
+        WHERE status = status_proyek AND total > 0
+      ),
+      batas AS (SELECT project_id, sort_order, id FROM kandidat WHERE peringkat = 1)
+      UPDATE project_activities SET
+        done_date = CASE
+          WHEN (project_activities.sort_order, project_activities.id) <=
+               (SELECT b.sort_order, b.id FROM batas b
+                WHERE b.project_id = project_activities.project_id)
+          THEN COALESCE(
+            project_activities.done_date,
+            (SELECT p.start_date FROM projects p WHERE p.id = project_activities.project_id)
+          )
+          ELSE NULL
+        END,
+        done_by = CASE
+          WHEN (project_activities.sort_order, project_activities.id) <=
+               (SELECT b.sort_order, b.id FROM batas b
+                WHERE b.project_id = project_activities.project_id)
+          THEN project_activities.done_by
+          ELSE NULL
+        END
+      WHERE project_id IN (SELECT project_id FROM batas);
+
+      -- 2. Samakan progres tersimpan dengan hasil hitungan checklist. Sesudah
+      -- langkah 3 tidak ada lagi jalan lain untuk mengisinya, jadi angka yang
+      -- tertinggal di sini akan bertahan sampai ada yang mencentang sesuatu.
+      UPDATE projects SET progress_pct = (
+        SELECT CAST(ROUND(
+          SUM(CASE WHEN a.done_date IS NOT NULL THEN a.weight ELSE 0 END) * 100.0
+          / NULLIF(SUM(a.weight), 0)
+        ) AS INTEGER)
+        FROM project_activities a WHERE a.project_id = projects.id
+      )
+      WHERE EXISTS (SELECT 1 FROM project_activities a WHERE a.project_id = projects.id)
+        AND (SELECT SUM(weight) FROM project_activities a WHERE a.project_id = projects.id) > 0;
+
+      -- 3. Sakelarnya dilepas. Progres tidak bisa lagi diketik dari mana pun.
+      ALTER TABLE projects DROP COLUMN progress_mode;
+
+      -- 4. Satu pengecualian yang jujur: "Tertunda" bukan hasil pekerjaan, jadi
+      -- tidak ada aktivitas yang bisa menurunkannya. Selama kolom ini terisi ia
+      -- menang atas status hasil hitungan; dikosongkan, proyek kembali mengikuti
+      -- checklist-nya.
+      ALTER TABLE projects ADD COLUMN status_override TEXT
+        CHECK (status_override IS NULL OR status_override IN
+          ('Prospect', 'Penawaran', 'Negosiasi', 'Berjalan', 'Tertunda', 'Selesai'));
+
+      -- Proyek yang statusnya tidak diwakili satu pun aktivitas akan kehilangan
+      -- statusnya begitu checklist mengambil alih. Dikunci sekarang, sebelum itu
+      -- sempat terjadi.
+      UPDATE projects SET status_override = status
+      WHERE EXISTS (SELECT 1 FROM project_activities a WHERE a.project_id = projects.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM project_activities a
+          WHERE a.project_id = projects.id AND a.status = projects.status
+        );
+    `,
+  },
 ];
