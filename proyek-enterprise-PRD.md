@@ -912,14 +912,130 @@ komponen server. Menambah pintu kedua berarti menduakan penjaganya.
 
 ## 8. Teknologi yang Digunakan
 
-- **Frontend**: Next.js (React) dengan Tailwind CSS
-- **Backend**: Next.js API Routes
-- **Database**: SQLite dengan ORM Prisma
-- **Autentikasi**: JWT (JSON Web Token) / NextAuth
-- **Notifikasi Email**: Nodemailer / Email Service
-- **Hosting**: Vercel (frontend & serverless function)
-- **Styling Tema**: CSS Variables + context/localStorage untuk persistensi tema
-- **Pengujian**: Jest (unit test), Playwright (E2E)
+| Lapisan | Yang dipakai | Catatan |
+|---|---|---|
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, Tailwind v4 | |
+| Backend | Server Action + Route Handler di proses yang sama | |
+| Database | **SQLite lewat `node:sqlite` bawaan Node** | Tanpa ORM, tanpa dependensi native |
+| Autentikasi | Token acak di tabel `sessions` + cookie `httpOnly` | Bukan JWT: token yang bisa dicabut lebih cocok karena sesi memang perlu dicabut saat sandi, akses, atau email berubah |
+| Sandi | scrypt (`node:crypto`) | |
+| Notifikasi | Dihitung dari keadaan proyek, ditampilkan di aplikasi | Belum ada pengiriman email |
+| Ekspor | `write-excel-file`, `docx`, `pdf-lib` | Ketiganya JavaScript murni |
+| Pengujian | Berkas `*.check.ts` berbasis `assert`, dijalankan `npx tsx` | 30 berkas, tanpa kerangka uji. Tiap modul murni punya berkas ceknya sendiri; jalankan satu-satu atau seluruhnya |
+| Hosting | **VPS Ubuntu + PM2 + nginx**, di belakang Cloudflare | Lihat §8a |
+
+**Aplikasi ini tidak bisa dipasang di platform serverless** (Vercel, Netlify,
+Cloud Functions). Datanya satu berkas SQLite di disk; lingkungan serverless
+memberi penyimpanan sementara yang berbeda-beda tiap permintaan, jadi setiap
+perubahan akan hilang tanpa peringatan. Ia butuh mesin dengan disk tetap.
+
+---
+
+## 8a. Deploy & Pembaruan
+
+### Yang berjalan di produksi
+
+| | |
+|---|---|
+| Alamat | **https://enterprise.jayasurvey.id/dashboard** |
+| Server | `srv607681` — 157.173.222.69, Ubuntu 24.04 LTS |
+| Kode | `/srv/enterprise-dashboard` (clone dari `github.com/harirureror/Enterprise`) |
+| **Database** | **`/srv/enterprise-data/dashboard.db`** — sengaja DI LUAR folder kode |
+| Proses | PM2, nama `enterprise`, mendengar `127.0.0.1:3000` |
+| Runtime | Node 24 lewat symlink `/usr/local/bin/node24` |
+| Web server | nginx → `/dashboard` diproksikan, `/` disisakan untuk landing page |
+| Sertifikat | Let's Encrypt (certbot), perpanjangan otomatis |
+| DNS | Cloudflare, rekaman A **Proxied** |
+
+**Node 24, bukan Node sistem.** Server memakai Node v20 untuk aplikasi lain, dan
+`node:sqlite` baru ada sejak Node 22.5 — di v20 ia menjawab
+`ERR_UNKNOWN_BUILTIN_MODULE` dan aplikasinya tidak menyala sama sekali. Node 24
+dipasang lewat nvm khusus untuk aplikasi ini; **Node sistem tidak disentuh**.
+PM2 menunjuk symlink, bukan jalur berversi, supaya menaikkan Node cukup
+mengarahkan ulang satu tautan.
+
+**Database di luar folder kode.** `DASHBOARD_DB_PATH` menunjuk
+`/srv/enterprise-data/`, jadi `git reset --hard` dan rebuild tidak akan pernah
+menyentuh data kerja.
+
+**Prefiks `/dashboard` ikut dibangun ke dalam aplikasi.** `APP_BASE_PATH`
+dibaca `next.config.ts` **saat build**. Kalau hanya nginx yang tahu prefiksnya,
+seluruh aset dan tautan internal tetap menunjuk ke akar dan halamannya rusak
+tanpa pesan galat. Nilainya harus sama persis di tiga tempat: `.env.production`,
+`location` di nginx, dan build.
+
+**Rekaman DNS wajib Proxied (awan oranye).** `ufw` hanya membuka port 80/443
+untuk rentang IP Cloudflare. Dengan DNS-only, permintaan datang dari IP asli dan
+ditolak firewall — situsnya tidak terbuka sama sekali. **Mode SSL Cloudflare
+harus Full atau Full (strict)**, bukan Flexible: cookie sesi disetel `secure` di
+produksi, dan dengan Flexible login akan berputar tanpa pernah berhasil.
+
+### Cara memperbarui
+
+```bash
+ssh root@157.173.222.69 /srv/enterprise-dashboard/deploy.sh
+```
+
+Satu perintah. Skrip itu menarik kode dari `origin/main`, memasang dependensi,
+membangun, memuat ulang PM2, lalu memastikan situsnya benar-benar menjawab.
+
+**Jangan menjalankan langkahnya satu per satu dari ingatan** — urutannya
+mengandung satu jebakan yang pernah menjatuhkan produksi, dan skrip itu ada
+justru untuk mengunci urutannya.
+
+### Jebakan yang dikunci skrip
+
+**`npm ci` tidak boleh berjalan dengan `NODE_ENV=production`.** npm akan
+melewatkan devDependencies, dan Tailwind (`@tailwindcss/postcss`) ada di sana.
+Build lalu gagal dengan `Cannot find module '@tailwindcss/postcss'` dan PM2
+masuk status `errored` — situs mati. Ini pernah terjadi. Skrip memasang
+dependensi dengan `NODE_ENV=development npm ci --include=dev`, dan baru memuat
+`.env.production` **setelah** itu, khusus untuk langkah build.
+
+**Dua jaring pengaman, keduanya sudah diuji di server:**
+
+1. **Build gagal tidak menjatuhkan situs.** Build lama disingkirkan ke
+   `.next.bak`, bukan dihapus. Build baru gagal berarti yang lama dikembalikan
+   dan PM2 tidak pernah disentuh. Diuji dengan memaksa build gagal: `.next`
+   dipulihkan, situs tetap menjawab 200, PM2 tetap `online`.
+2. **Restart yang tidak sehat berisik.** Sesudah `pm2 restart`, skrip menunggu
+   sampai 20 detik dan keluar dengan kode bukan-nol kalau `/dashboard/login`
+   tidak menjawab 200 — kebalikan dari kegagalan senyap yang pernah terjadi.
+
+### Kalau ada yang salah
+
+| Gejala | Periksa |
+|---|---|
+| Skrip berhenti di "Build GAGAL" | Galat build ada di keluarannya. Situs masih hidup dengan versi lama; perbaiki kodenya, dorong, jalankan lagi |
+| Skrip berhenti di "TIDAK SEHAT" | `pm2 logs enterprise --err --lines 30` |
+| Halaman terbuka tapi tanpa gaya (CSS hilang) | `APP_BASE_PATH` saat build berbeda dari `location` nginx |
+| Login berputar tanpa berhasil | Mode SSL Cloudflare masih Flexible |
+| Situs tidak terbuka sama sekali | Rekaman DNS berubah jadi DNS-only (awan abu-abu) |
+| `ERR_UNKNOWN_BUILTIN_MODULE` | Build memakai Node sistem (v20), bukan `node24` |
+
+### Memulihkan database
+
+Berkasnya satu file dan tidak memakai mode WAL, jadi menyalinnya saat aplikasi
+berhenti sudah cukup:
+
+```bash
+pm2 stop enterprise
+cp /srv/enterprise-data/dashboard.db /srv/enterprise-data/dashboard.$(date +%F).db
+pm2 start enterprise
+```
+
+### Yang belum terpasang di produksi
+
+Dicatat di sini supaya tidak terbaca sebagai sudah beres:
+
+- **Pencadangan database terjadwal.** Belum ada. Perintah di atas masih manual.
+- **Cron pengingat.** Endpoint `POST /api/reminders/run` sudah ada dan
+  `CRON_SECRET` sudah disetel di `.env.production`, tapi **belum ada cron yang
+  memanggilnya**. Artinya pengingat berjadwal (F12) belum benar-benar berjalan
+  di produksi, meski §11 menyebutnya otomatis. Yang dibutuhkan satu baris cron
+  yang memanggil endpoint itu dengan header rahasianya.
+- **Landing page.** `https://enterprise.jayasurvey.id/` masih halaman penampung
+  di `/var/www/enterprise.jayasurvey.id/index.html`.
 
 ---
 
