@@ -1013,29 +1013,64 @@ dependensi dengan `NODE_ENV=development npm ci --include=dev`, dan baru memuat
 | Situs tidak terbuka sama sekali | Rekaman DNS berubah jadi DNS-only (awan abu-abu) |
 | `ERR_UNKNOWN_BUILTIN_MODULE` | Build memakai Node sistem (v20), bukan `node24` |
 
-### Memulihkan database
+### Tugas terjadwal
 
-Berkasnya satu file dan tidak memakai mode WAL, jadi menyalinnya saat aplikasi
-berhenti sudah cukup:
+Dua cron, keduanya di `/etc/cron.d/enterprise` (salinan terversi di
+`ops/cron-enterprise`). Server berjalan **UTC**; jadwal ditulis UTC dengan
+padanan WIB di komentarnya.
+
+| Jadwal | Skrip | Kerjanya |
+|---|---|---|
+| 01:00 UTC / **08:00 WIB** | `cron-pengingat.sh` | `POST /api/reminders/run` — menjalankan pengingat yang jatuh tempo (F12) |
+| 20:00 UTC / **03:00 WIB** | `backup-db.sh` | Cadangan database harian |
+
+Keluarannya masuk `/var/log/enterprise-cron.log`, dirotasi mingguan dan
+disimpan 8 minggu (`ops/logrotate-enterprise`). Diarahkan ke berkas, bukan
+email: mesin ini tidak punya MTA, jadi keluaran cron yang tidak diarahkan
+hilang tanpa jejak.
+
+**Rahasia tidak ditulis di crontab.** `cron-pengingat.sh` membacanya dari
+`.env.production` (mode 600); berkas di `/etc/cron.d` terbaca semua pengguna
+mesin. Skrip itu juga memanggil lewat `127.0.0.1`, bukan lewat domainnya
+sendiri — permintaan ke domain akan berputar ke Cloudflare lalu kembali, dan
+ufw hanya mengizinkan 80/443 dari rentang Cloudflare, jadi server akan ditolak
+firewallnya sendiri.
+
+**cron mengabaikan berkas `/etc/cron.d` yang bisa ditulis kelompok atau orang
+lain, tanpa memberi tahu.** Mode 644 milik root itu syarat, bukan kerapian.
+
+### Pencadangan database
+
+`backup-db.sh` berjalan tiap hari dan menyimpan ke `/srv/enterprise-backup/`
+sebagai `dashboard-YYYY-MM-DD.db.gz`, disimpan **30 hari**.
+
+**Memakai `VACUUM INTO`, bukan `cp`.** Perintah itu meminta SQLite sendiri
+menuliskan salinan yang konsisten, jadi aman dijalankan saat aplikasi sedang
+melayani permintaan. `cp` bisa menangkap berkas di tengah penulisan dan
+menghasilkan cadangan yang rusak tanpa terlihat rusak.
+
+**Tiap salinan dibuka kembali dan dilewatkan `PRAGMA integrity_check`** sebelum
+dinyatakan berhasil; skripnya keluar dengan kode bukan-nol kalau gagal.
+Cadangan yang tidak bisa dibuka lebih buruk daripada tidak punya cadangan —
+ia memberi rasa aman yang keliru.
+
+Memulihkan:
 
 ```bash
 pm2 stop enterprise
-cp /srv/enterprise-data/dashboard.db /srv/enterprise-data/dashboard.$(date +%F).db
+gunzip -c /srv/enterprise-backup/dashboard-2026-09-08.db.gz   > /srv/enterprise-data/dashboard.db
 pm2 start enterprise
 ```
 
+Menjalankan cadangan di luar jadwal cukup `/srv/enterprise-dashboard/backup-db.sh`;
+menjalankannya dua kali di hari yang sama menimpa, bukan menumpuk.
+
 ### Yang belum terpasang di produksi
 
-Dicatat di sini supaya tidak terbaca sebagai sudah beres:
-
-- **Pencadangan database terjadwal.** Belum ada. Perintah di atas masih manual.
-- **Cron pengingat.** Endpoint `POST /api/reminders/run` sudah ada dan
-  `CRON_SECRET` sudah disetel di `.env.production`, tapi **belum ada cron yang
-  memanggilnya**. Artinya pengingat berjadwal (F12) belum benar-benar berjalan
-  di produksi, meski §11 menyebutnya otomatis. Yang dibutuhkan satu baris cron
-  yang memanggil endpoint itu dengan header rahasianya.
 - **Landing page.** `https://enterprise.jayasurvey.id/` masih halaman penampung
   di `/var/www/enterprise.jayasurvey.id/index.html`.
+- **Cadangan di luar mesin.** Salinan harian ada, tapi semuanya di disk yang
+  sama dengan databasenya. Kalau VPS-nya hilang, cadangannya ikut hilang.
 
 ---
 
