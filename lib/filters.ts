@@ -15,6 +15,33 @@ import {
 export const SEMUA = "Semua";
 export type Semua = typeof SEMUA;
 
+/**
+ * Tahap kasar sebuah proyek — pertanyaan yang paling sering diajukan ke
+ * timeline bukan "statusnya apa" melainkan "sudah jalan atau belum".
+ *
+ * "Tertunda" masuk BERJALAN, bukan AKAN: pekerjaan yang diparkir sudah
+ * terlanjur dimulai, dan justru itu yang perlu terlihat.
+ */
+export type FaseProyek = "akan" | "berjalan" | "selesai";
+
+const FASE: Record<ProjectStatus, FaseProyek> = {
+  Prospect: "akan",
+  Penawaran: "akan",
+  Negosiasi: "akan",
+  Berjalan: "berjalan",
+  Tertunda: "berjalan",
+  Selesai: "selesai",
+};
+
+export function faseProyek(status: ProjectStatus): FaseProyek {
+  return FASE[status];
+}
+
+/** Saring menurut tahap. Daftar tahap kosong berarti tidak ada yang tampil. */
+export function filterByFase(projects: Project[], fase: FaseProyek[]): Project[] {
+  return projects.filter((p) => fase.includes(faseProyek(p.status)));
+}
+
 export type ProjectFilter = {
   status: ProjectStatus | Semua;
   priority: ProjectPriority | Semua;

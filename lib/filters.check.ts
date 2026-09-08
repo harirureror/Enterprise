@@ -3,8 +3,8 @@
  * ponytail: assert polos, sejalan dengan lib/timeline.check.ts.
  */
 import assert from "node:assert/strict";
-import { SEMUA, filterProjects, parseProjectFilter } from "./filters";
-import type { Project } from "./types";
+import { SEMUA, faseProyek, filterByFase, filterProjects, parseProjectFilter } from "./filters";
+import { PROJECT_STATUSES, type Project } from "./types";
 
 function p(id: number, over: Partial<Project> = {}): Project {
   return {
@@ -143,5 +143,36 @@ assert.deepEqual(parseProjectFilter(new URLSearchParams({ ownerId: "abc" })).inv
 assert.deepEqual(parseProjectFilter(new URLSearchParams({ ownerId: "3.5" })).invalid, ["ownerId"]);
 assert.deepEqual(parseProjectFilter(new URLSearchParams({ ownerId: "-1" })).invalid, ["ownerId"]);
 assert.equal(parseProjectFilter(new URLSearchParams({ ownerId: "7" })).filter.ownerId, 7);
+
+
+/* --- faseProyek & filterByFase --------------------------------------------- */
+
+// Tiga status pertama belum jalan; dua berikutnya sudah; Selesai berakhir.
+assert.equal(faseProyek("Prospect"), "akan");
+assert.equal(faseProyek("Penawaran"), "akan");
+assert.equal(faseProyek("Negosiasi"), "akan");
+assert.equal(faseProyek("Berjalan"), "berjalan");
+// Yang diparkir SUDAH terlanjur dimulai — justru itu yang perlu terlihat.
+assert.equal(faseProyek("Tertunda"), "berjalan");
+assert.equal(faseProyek("Selesai"), "selesai");
+
+// Setiap status yang sah punya tahapnya; tidak ada yang jatuh ke undefined.
+for (const s of PROJECT_STATUSES) {
+  assert.ok(["akan", "berjalan", "selesai"].includes(faseProyek(s)), `${s} tanpa tahap`);
+}
+
+const contoh = PROJECT_STATUSES.map((st, i) => p(900 + i, { status: st }));
+
+// Bawaan timeline: hanya yang sudah berjalan.
+assert.deepEqual(
+  filterByFase(contoh, ["berjalan"]).map((p) => p.status),
+  ["Berjalan", "Tertunda"]
+);
+// Ditambah yang akan berjalan.
+assert.equal(filterByFase(contoh, ["berjalan", "akan"]).length, 5);
+// Ketiganya = semuanya.
+assert.equal(filterByFase(contoh, ["akan", "berjalan", "selesai"]).length, PROJECT_STATUSES.length);
+// Tanpa tahap sama sekali tidak menampilkan apa pun, bukan menampilkan semua.
+assert.deepEqual(filterByFase(contoh, []), []);
 
 console.log("ok: filters");

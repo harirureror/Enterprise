@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Badge from "@/components/Badge";
 import ExportMenu from "@/components/ExportMenu";
-import { SEMUA, type Semua, filterProjects } from "@/lib/filters";
+import { SEMUA, type FaseProyek, type Semua, filterByFase, filterProjects } from "@/lib/filters";
 
 import { barPosition, monthTicks, overlapInfo, overlapPerMonth, timelineRange } from "@/lib/timeline";
 import {
@@ -45,6 +45,11 @@ export default function TimelineChart({
   const [priority, setPriority] = useState<ProjectPriority | Semua>(SEMUA);
   const [type, setType] = useState<ProjectType | Semua>(SEMUA);
   const [ownerId, setOwnerId] = useState<number | Semua>(SEMUA);
+  /* Bawaan: hanya yang sudah berjalan. Pertanyaan yang paling sering diajukan
+     ke timeline adalah "siapa sedang mengerjakan apa", dan prospek yang belum
+     tentu jadi hanya menambah baris yang harus dilewati mata. */
+  const [tampilAkan, setTampilAkan] = useState(false);
+  const [tampilSelesai, setTampilSelesai] = useState(false);
 
   // Anggota yang benar-benar punya proyek, biar dropdown tidak penuh nama kosong.
   const owners = useMemo(() => {
@@ -54,10 +59,55 @@ export default function TimelineChart({
       .sort((a, b) => a.name.localeCompare(b.name, "id"));
   }, [projects, users]);
 
-  // Predikatnya sama persis dengan GET /api/projects, jadi hasilnya tidak bisa beda.
+  const fase = useMemo<FaseProyek[]>(() => {
+    const f: FaseProyek[] = ["berjalan"];
+    if (tampilAkan) f.push("akan");
+    if (tampilSelesai) f.push("selesai");
+    return f;
+  }, [tampilAkan, tampilSelesai]);
+
+  // Tahap disaring lebih dulu, baru penyaring kolom. Predikat kolomnya sama
+  // persis dengan GET /api/projects, jadi hasilnya tidak bisa beda.
+  const seTahap = useMemo(() => filterByFase(projects, fase), [projects, fase]);
   const filtered = useMemo(
-    () => filterProjects(projects, { status, priority, type, ownerId }),
-    [projects, status, priority, type, ownerId]
+    () => filterProjects(seTahap, { status, priority, type, ownerId }),
+    [seTahap, status, priority, type, ownerId]
+  );
+
+  // Yang disembunyikan tahap dihitung dan ditulis apa adanya: penyaring yang
+  // menyembunyikan tanpa memberi tahu membuat orang mengira datanya hilang.
+  const tersembunyi = projects.length - seTahap.length;
+
+  const sakelarFase = (
+    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <span className="text-muted">Tahap</span>
+      <span className="rounded-lg bg-background px-2.5 py-1 text-xs text-muted ring-1 ring-border">
+        Sudah berjalan · selalu tampil
+      </span>
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          checked={tampilAkan}
+          onChange={(e) => setTampilAkan(e.target.checked)}
+          className="h-4 w-4 accent-accent"
+        />
+        <span>Akan berjalan</span>
+      </label>
+      <label className="flex cursor-pointer items-center gap-2">
+        <input
+          type="checkbox"
+          checked={tampilSelesai}
+          onChange={(e) => setTampilSelesai(e.target.checked)}
+          className="h-4 w-4 accent-accent"
+        />
+        <span>Selesai</span>
+      </label>
+      {tersembunyi > 0 && (
+        <span className="text-xs text-muted">
+          {tersembunyi} proyek disembunyikan tahap
+        </span>
+      )}
+    </div>
   );
 
   const filterBar = (
@@ -134,11 +184,14 @@ export default function TimelineChart({
   if (!range) {
     return (
       <div>
+        {sakelarFase}
         {filterBar}
         <p className="rounded-xl border border-border bg-surface p-5 text-sm text-muted shadow-card">
           {projects.length === 0
             ? "Belum ada proyek untuk ditampilkan di timeline."
-            : "Tidak ada proyek yang cocok dengan filter ini."}
+            : seTahap.length === 0
+              ? `Tidak ada proyek yang sudah berjalan. ${tersembunyi} proyek lain ada di tahap yang belum ditampilkan — centang "Akan berjalan" atau "Selesai" di atas.`
+              : "Tidak ada proyek yang cocok dengan filter ini."}
         </p>
       </div>
     );
@@ -156,6 +209,7 @@ export default function TimelineChart({
 
   return (
     <div>
+      {sakelarFase}
       {filterBar}
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
