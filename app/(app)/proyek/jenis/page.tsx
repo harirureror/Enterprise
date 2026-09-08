@@ -1,6 +1,7 @@
 import Link from "next/link";
+import ActivityTemplateEditor from "@/components/ActivityTemplateEditor";
 import Badge from "@/components/Badge";
-import { getTypeBreakdown } from "@/lib/api";
+import { getActivityTemplates, getTypeBreakdown } from "@/lib/api";
 import { formatDate, statusClass } from "@/lib/ui";
 import { PROJECT_STATUSES } from "@/lib/types";
 import { requireAbility } from "@/lib/auth";
@@ -17,6 +18,7 @@ export default async function JenisProyekPage() {
 
   const jenis = await getTypeBreakdown();
   const total = jenis.reduce((sum, j) => sum + j.total, 0);
+  const templates = await getActivityTemplates();
 
   return (
     <div className="w-full">
@@ -29,7 +31,8 @@ export default async function JenisProyekPage() {
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Empat kategori tetap divisi Enterprise: Penjualan, Jasa, Training, dan Riset. Jenis
             dipilih saat membuat atau mengedit proyek — halaman ini memantau sebaran dan beban
-            kerjanya.
+            kerjanya. Tiap jenis juga punya template aktivitas — alur kerja yang disalin ke
+            proyek baru dan menggerakkan progresnya.
           </p>
         </div>
       </header>
@@ -121,6 +124,11 @@ export default async function JenisProyekPage() {
                   </dl>
                 </>
               )}
+
+              <ActivityTemplateEditor
+                typeCode={j.type}
+                templates={templates.filter((t) => t.typeCode === j.type)}
+              />
             </article>
           );
         })}

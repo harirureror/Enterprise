@@ -1,5 +1,6 @@
 import { getDb } from "./index";
 import type {
+  ActivityTemplate,
   AgendaEntry,
   PlanComment,
   PlanOutput,
@@ -8,6 +9,7 @@ import type {
   StrategicPlan,
   Project,
   ProgressEntry,
+  ProjectActivity,
   ProjectComment,
   ProjectDependency,
   ProjectTypeInfo,
@@ -200,6 +202,7 @@ function keProject(r: Row): Project {
     status: teks(r.status) as Project["status"],
     priority: teks(r.priority) as Project["priority"],
     priorityMode: teks(r.priority_mode) as Project["priorityMode"],
+    progressMode: teks(r.progress_mode) as Project["progressMode"],
     progressPct: angka(r.progress_pct),
     clientOrg: teks(r.client_org),
     locationCity: teks(r.location_city),
@@ -232,6 +235,7 @@ const KOLOM_PROJECT = [
   "status",
   "priority",
   "priority_mode",
+  "progress_mode",
   "progress_pct",
   "client_org",
   "location_city",
@@ -263,6 +267,7 @@ function isiProject(p: Omit<Project, "id">): unknown[] {
     p.status,
     p.priority,
     p.priorityMode,
+    p.progressMode,
     p.progressPct,
     p.clientOrg,
     p.locationCity,
@@ -329,6 +334,205 @@ export const projects = {
 
   remove(id: number): boolean {
     return getDb().prepare("DELETE FROM projects WHERE id = ?").run(id).changes > 0;
+  },
+};
+
+/* --- activity_templates & project_activities -------------------------------- */
+
+function keTemplate(r: Row): ActivityTemplate {
+  return {
+    id: angka(r.id),
+    typeCode: teks(r.type_code),
+    name: teks(r.name),
+    weight: angka(r.weight),
+    status: teks(r.status) as ActivityTemplate["status"],
+    slaDays: angkaAtauNull(r.sla_days),
+    sortOrder: angka(r.sort_order),
+  };
+}
+
+export const activityTemplates = {
+  all(): ActivityTemplate[] {
+    return getDb()
+      .prepare("SELECT * FROM activity_templates ORDER BY type_code, sort_order, id")
+      .all()
+      .map((r) => keTemplate(r as Row));
+  },
+
+  byType(typeCode: string): ActivityTemplate[] {
+    return getDb()
+      .prepare("SELECT * FROM activity_templates WHERE type_code = ? ORDER BY sort_order, id")
+      .all(typeCode)
+      .map((r) => keTemplate(r as Row));
+  },
+
+  byId(id: number): ActivityTemplate | null {
+    const r = getDb().prepare("SELECT * FROM activity_templates WHERE id = ?").get(id);
+    return r ? keTemplate(r as Row) : null;
+  },
+
+  insert(input: Omit<ActivityTemplate, "id">): ActivityTemplate {
+    const db = getDb();
+    db.prepare(
+      `INSERT INTO activity_templates (type_code, name, weight, status, sla_days, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(input.typeCode, input.name, input.weight, input.status, input.slaDays, input.sortOrder);
+    const id = angka((db.prepare("SELECT last_insert_rowid() AS id").get() as Row).id);
+    return { ...input, id };
+  },
+
+  update(id: number, input: Omit<ActivityTemplate, "id" | "typeCode">): ActivityTemplate | null {
+    const hasil = getDb()
+      .prepare(
+        `UPDATE activity_templates
+           SET name = ?, weight = ?, status = ?, sla_days = ?, sort_order = ?
+         WHERE id = ?`
+      )
+      .run(input.name, input.weight, input.status, input.slaDays, input.sortOrder, id);
+    return hasil.changes === 0 ? null : activityTemplates.byId(id);
+  },
+
+  remove(id: number): boolean {
+    return getDb().prepare("DELETE FROM activity_templates WHERE id = ?").run(id).changes > 0;
+  },
+
+  nextSortOrder(typeCode: string): number {
+    const r = getDb()
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order) + 1, 0) AS n FROM activity_templates WHERE type_code = ?"
+      )
+      .get(typeCode) as Row;
+    return angka(r.n);
+  },
+};
+
+function keActivity(r: Row): ProjectActivity {
+  return {
+    id: angka(r.id),
+    projectId: angka(r.project_id),
+    name: teks(r.name),
+    weight: angka(r.weight),
+    status: teks(r.status) as ProjectActivity["status"],
+    slaDays: angkaAtauNull(r.sla_days),
+    targetDate: teksAtauNull(r.target_date),
+    doneDate: teksAtauNull(r.done_date),
+    doneBy: angkaAtauNull(r.done_by),
+    sortOrder: angka(r.sort_order),
+  };
+}
+
+export const projectActivities = {
+  all(): ProjectActivity[] {
+    return getDb()
+      .prepare("SELECT * FROM project_activities ORDER BY project_id, sort_order, id")
+      .all()
+      .map((r) => keActivity(r as Row));
+  },
+
+  byProject(projectId: number): ProjectActivity[] {
+    return getDb()
+      .prepare("SELECT * FROM project_activities WHERE project_id = ? ORDER BY sort_order, id")
+      .all(projectId)
+      .map((r) => keActivity(r as Row));
+  },
+
+  byId(id: number): ProjectActivity | null {
+    const r = getDb().prepare("SELECT * FROM project_activities WHERE id = ?").get(id);
+    return r ? keActivity(r as Row) : null;
+  },
+
+  insert(input: Omit<ProjectActivity, "id">): ProjectActivity {
+    const db = getDb();
+    db.prepare(
+      `INSERT INTO project_activities
+         (project_id, name, weight, status, sla_days, target_date, done_date, done_by, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      input.projectId,
+      input.name,
+      input.weight,
+      input.status,
+      input.slaDays,
+      input.targetDate,
+      input.doneDate,
+      input.doneBy,
+      input.sortOrder
+    );
+    const id = angka((db.prepare("SELECT last_insert_rowid() AS id").get() as Row).id);
+    return { ...input, id };
+  },
+
+  update(id: number, input: Omit<ProjectActivity, "id" | "projectId">): ProjectActivity | null {
+    const hasil = getDb()
+      .prepare(
+        `UPDATE project_activities SET
+           name = ?, weight = ?, status = ?, sla_days = ?, target_date = ?,
+           done_date = ?, done_by = ?, sort_order = ?, updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .run(
+        input.name,
+        input.weight,
+        input.status,
+        input.slaDays,
+        input.targetDate,
+        input.doneDate,
+        input.doneBy,
+        input.sortOrder,
+        id
+      );
+    return hasil.changes === 0 ? null : projectActivities.byId(id);
+  },
+
+  remove(id: number): boolean {
+    return getDb().prepare("DELETE FROM project_activities WHERE id = ?").run(id).changes > 0;
+  },
+
+  nextSortOrder(projectId: number): number {
+    const r = getDb()
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order) + 1, 0) AS n FROM project_activities WHERE project_id = ?"
+      )
+      .get(projectId) as Row;
+    return angka(r.n);
+  },
+
+  /**
+   * Salin template sebuah jenis ke satu proyek — semua atau tidak sama sekali.
+   *
+   * Disalin, bukan dirujuk: mengubah template kelak tidak boleh menggeser
+   * progres proyek yang sudah berjalan.
+   */
+  copyTemplateTo(projectId: number, typeCode: string): number {
+    const template = activityTemplates.byType(typeCode);
+    if (template.length === 0) return 0;
+
+    const db = getDb();
+    db.exec("BEGIN");
+    try {
+      const insert = db.prepare(
+        `INSERT INTO project_activities
+           (project_id, name, weight, status, sla_days, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      );
+      for (const t of template) {
+        insert.run(projectId, t.name, t.weight, t.status, t.slaDays, t.sortOrder);
+      }
+      db.exec("COMMIT");
+      return template.length;
+    } catch (err) {
+      db.exec("ROLLBACK");
+      throw err;
+    }
+  },
+
+  /** Simpan progres dan status hasil hitungan checklist dalam satu tulisan. */
+  terapkanProgres(projectId: number, progressPct: number, status: string): void {
+    getDb()
+      .prepare(
+        "UPDATE projects SET progress_pct = ?, status = ?, updated_at = ? WHERE id = ?"
+      )
+      .run(progressPct, status, new Date().toISOString().slice(0, 10), projectId);
   },
 };
 

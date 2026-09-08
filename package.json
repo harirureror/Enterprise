@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:setup": "tsx lib/db/setup.ts"
   },
   "dependencies": {
     "docx": "^9.7.1",
@@ -25,6 +26,7 @@
     "eslint-config-next": "16.3.3",
     "fflate": "^0.8.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.5",
     "typescript": "^5"
   }
 }

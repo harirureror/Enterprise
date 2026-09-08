@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ActivityChecklist from "@/components/ActivityChecklist";
 import Badge from "@/components/Badge";
+import CurvaS from "@/components/CurvaS";
 import CommentThread from "@/components/CommentThread";
 import DependencyPicker from "@/components/DependencyPicker";
 import ProgressForm from "@/components/ProgressForm";
@@ -57,6 +59,9 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
     comments,
     dependencies,
     dependencyCandidates,
+    activities,
+    curva,
+    adaTemplate,
   } =
     detail;
   /* Hak dihitung sekali di server. Menyembunyikan tombol bukan kontrol
@@ -149,11 +154,29 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
             </div>
           </dl>
 
-          {bolehUbah && (
+          {activities.length > 0 && (
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="text-sm font-medium">Kurva S</h3>
+              <div className="mt-3">
+                <CurvaS
+                  titik={curva.titik}
+                  selisih={curva.selisih}
+                  totalBobot={curva.totalBobot}
+                  hariIni={hariIni}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Form ini kini jalur manual saja. Membiarkannya tetap muncul pada
+              proyek otomatis akan menawarkan angka yang langsung ditimpa
+              perhitungan checklist begitu ada yang dicentang. */}
+          {bolehUbah && project.progressMode === "manual" && (
             <div className="mt-5 border-t border-border pt-4">
               <h3 className="text-sm font-medium">Catat progres</h3>
               <p className="mt-0.5 text-xs text-muted">
-                Setiap pembaruan tersimpan di riwayat sebagai jejak audit.
+                Proyek ini memakai progres manual. Setiap pembaruan tersimpan di riwayat
+                sebagai jejak audit.
               </p>
               <div className="mt-3">
                 <ProgressForm projectId={project.id} current={project.progressPct} />
@@ -497,6 +520,21 @@ export default async function DetailProyekPage({ params }: PageProps<"/proyek/[i
         </section>
         )}
       </div>
+
+      <section
+        aria-labelledby="aktivitas-heading"
+        className="mt-6 rounded-xl border border-border bg-surface p-5 shadow-card"
+      >
+        <ActivityChecklist
+          projectId={project.id}
+          typeCode={project.type}
+          activities={activities}
+          progressMode={project.progressMode}
+          adaTemplate={adaTemplate}
+          bolehUbah={bolehUbah}
+          hariIni={hariIni}
+        />
+      </section>
 
       <section aria-labelledby="pengingat-heading" className="mt-6">
         <h2 id="pengingat-heading" className="text-headline-sm font-semibold">

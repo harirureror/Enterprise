@@ -243,6 +243,7 @@ const tersimpan: Project = {
   status: "Berjalan",
   priority: "Sedang",
   priorityMode: "manual",
+      progressMode: "auto",
   progressPct: 55,
   clientOrg: "Dinas PU Kota Bandung",
   locationCity: "Bandung",

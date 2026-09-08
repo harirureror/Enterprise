@@ -649,4 +649,125 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_plan_outputs_project ON plan_outputs(project_id);
     `,
   },
+  {
+    id: 17,
+    name: "aktivitas-dan-kurva-s",
+    up: `
+      -- Template alur kerja per jenis proyek. Alur Riset dan Penjualan jauh
+      -- berbeda, jadi tiap jenis punya daftarnya sendiri.
+      CREATE TABLE activity_templates (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        -- CHECK, bukan FOREIGN KEY ke project_types, dengan alasan yang sama
+        -- seperti projects.type: keempat jenis itu tetap, dan penegakannya
+        -- sudah di sini. FOREIGN KEY-nya juga akan mengikat migrasi ini pada
+        -- urutan pengisian project_types — pada database yang benar-benar baru
+        -- tabel itu masih kosong saat migrasi berjalan, dan template di bawah
+        -- gagal masuk.
+        type_code   TEXT NOT NULL
+                      CHECK (type_code IN ('Penjualan', 'Jasa', 'Training', 'Riset')),
+        name        TEXT NOT NULL,
+        weight      INTEGER NOT NULL CHECK (weight BETWEEN 0 AND 100),
+        -- Status yang berlaku begitu aktivitas ini selesai. Inilah jembatan
+        -- yang membuat projects.status bisa diisi sistem alih-alih diketik.
+        status      TEXT NOT NULL
+                      CHECK (status IN ('Prospect', 'Penawaran', 'Negosiasi',
+                                        'Berjalan', 'Tertunda', 'Selesai')),
+        -- Berapa hari sesudah aktivitas ini selesai, tindak lanjut jatuh tempo.
+        -- NULL berarti tidak ada tenggat. Contoh: penawaran berlaku 14 hari.
+        sla_days    INTEGER CHECK (sla_days IS NULL OR sla_days > 0),
+        sort_order  INTEGER NOT NULL DEFAULT 0
+      );
+
+      -- Salinan per proyek. Sengaja disalin, bukan dirujuk: mengubah template
+      -- tidak boleh menggeser progres proyek yang sudah berjalan.
+      CREATE TABLE project_activities (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        weight      INTEGER NOT NULL CHECK (weight BETWEEN 0 AND 100),
+        status      TEXT NOT NULL
+                      CHECK (status IN ('Prospect', 'Penawaran', 'Negosiasi',
+                                        'Berjalan', 'Tertunda', 'Selesai')),
+        sla_days    INTEGER CHECK (sla_days IS NULL OR sla_days > 0),
+        -- Menggambar garis RENCANA di kurva S.
+        target_date TEXT CHECK (target_date IS NULL OR target_date LIKE '____-__-__'),
+        -- Menggambar garis AKTUAL. NULL berarti belum selesai.
+        done_date   TEXT CHECK (done_date IS NULL OR done_date LIKE '____-__-__'),
+        done_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- Meniru priority_mode: progres dihitung dari checklist, kecuali sengaja
+      -- dikunci. Baris lama dikunci dulu supaya angka yang sudah diketik orang
+      -- tidak tertimpa sebelum aktivitasnya diperiksa.
+      ALTER TABLE projects ADD COLUMN progress_mode TEXT NOT NULL DEFAULT 'auto'
+        CHECK (progress_mode IN ('auto', 'manual'));
+
+      UPDATE projects SET progress_mode = 'manual';
+
+
+      -- Template awal keempat jenis. Bobot tiap jenis berjumlah 100.
+      INSERT INTO activity_templates (type_code, name, weight, status, sla_days, sort_order) VALUES
+        ('Penjualan', 'Prospek masuk',            5,  'Prospect',  NULL, 0),
+        ('Penjualan', 'Penawaran dikirim',        20, 'Penawaran', 14,   1),
+        ('Penjualan', 'Negosiasi harga',          15, 'Negosiasi', 7,    2),
+        ('Penjualan', 'PO / kontrak diterima',    20, 'Berjalan',  NULL, 3),
+        ('Penjualan', 'Barang diserahterimakan',  40, 'Selesai',   NULL, 4),
+
+        ('Jasa', 'Prospek masuk',                 5,  'Prospect',  NULL, 0),
+        ('Jasa', 'Penawaran dikirim',             15, 'Penawaran', 14,   1),
+        ('Jasa', 'Negosiasi lingkup dan harga',   10, 'Negosiasi', 7,    2),
+        ('Jasa', 'Kontrak ditandatangani',        10, 'Berjalan',  NULL, 3),
+        ('Jasa', 'Mobilisasi tim',                15, 'Berjalan',  NULL, 4),
+        ('Jasa', 'Akuisisi data lapangan',        25, 'Berjalan',  NULL, 5),
+        ('Jasa', 'Pengolahan dan laporan',        20, 'Selesai',   NULL, 6),
+
+        ('Training', 'Prospek masuk',             5,  'Prospect',  NULL, 0),
+        ('Training', 'Proposal dikirim',          20, 'Penawaran', 14,   1),
+        ('Training', 'Jadwal dan peserta sepakat',15, 'Negosiasi', 7,    2),
+        ('Training', 'Pelatihan terselenggara',   40, 'Berjalan',  NULL, 3),
+        ('Training', 'Sertifikat dan evaluasi',   20, 'Selesai',   NULL, 4),
+
+        ('Riset', 'Rumusan masalah disepakati',   10, 'Prospect',  NULL, 0),
+        ('Riset', 'Proposal dan anggaran',        15, 'Penawaran', 21,   1),
+        ('Riset', 'Persetujuan pelaksanaan',      10, 'Negosiasi', 14,   2),
+        ('Riset', 'Pengumpulan data',             30, 'Berjalan',  NULL, 3),
+        ('Riset', 'Analisis',                     20, 'Berjalan',  NULL, 4),
+        ('Riset', 'Laporan atau publikasi',       15, 'Selesai',   NULL, 5);
+
+      -- Bekali proyek yang sudah ada dengan salinan template jenisnya, lalu
+      -- tandai selesai aktivitas sampai statusnya sekarang. Tanggal selesainya
+      -- memakai start_date sebagai perkiraan: tanggal sebenarnya tidak pernah
+      -- dicatat, dan menebak yang lebih rinci hanya akan terlihat lebih pasti
+      -- daripada yang sebenarnya diketahui.
+      --
+      -- target_date sengaja dibiarkan NULL. Tanpa rencana yang benar-benar
+      -- disusun orang, garis rencana di kurva S hanya akan jadi karangan.
+      INSERT INTO project_activities
+        (project_id, name, weight, status, sla_days, target_date, done_date, sort_order)
+      SELECT
+        p.id, t.name, t.weight, t.status, t.sla_days, NULL,
+        CASE
+          WHEN (CASE t.status
+                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
+                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
+                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
+             <=
+               (CASE p.status
+                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
+                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
+                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
+          THEN p.start_date
+          ELSE NULL
+        END,
+        t.sort_order
+      FROM projects p
+      JOIN activity_templates t ON t.type_code = p.type;
+
+      CREATE INDEX idx_activity_templates_type ON activity_templates(type_code, sort_order);
+      CREATE INDEX idx_project_activities_project ON project_activities(project_id, sort_order);
+    `,
+  },
 ];

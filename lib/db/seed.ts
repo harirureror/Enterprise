@@ -52,6 +52,7 @@ export type SeedHasil = {
   planSteps: number;
   planProspects: number;
   planOutputs: number;
+  activities: number;
   /** Seed dilewati karena database sudah berisi. */
   dilewati: boolean;
 };
@@ -70,6 +71,7 @@ const KOSONG: SeedHasil = {
   planSteps: 0,
   planProspects: 0,
   planOutputs: 0,
+  activities: 0,
   dilewati: true,
 };
 
@@ -332,6 +334,41 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
         p.updatedAt
       );
     }
+    /* Checklist aktivitas untuk proyek contoh, memakai aturan yang sama persis
+       dengan migrasi 17: salin template jenisnya, tandai selesai aktivitas
+       sampai tahap statusnya, dan kunci progresnya ke manual. Angka progres
+       dari mock-data tetap yang berlaku sampai seseorang memeriksa checklist
+       itu dan menyalakan mode otomatis — checklist hasil terkaan tidak boleh
+       diam-diam menimpa angka yang ditulis orang. */
+    db.exec(`
+      -- Dikosongkan dulu supaya --force tidak menumpuk salinan: baris di sini
+      -- tidak punya id tetap dari mock-data, jadi ON CONFLICT tidak menolong.
+      DELETE FROM project_activities;
+
+      INSERT INTO project_activities
+        (project_id, name, weight, status, sla_days, target_date, done_date, sort_order)
+      SELECT
+        p.id, t.name, t.weight, t.status, t.sla_days, NULL,
+        CASE
+          WHEN (CASE t.status
+                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
+                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
+                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
+             <=
+               (CASE p.status
+                  WHEN 'Prospect'  THEN 0 WHEN 'Penawaran' THEN 1
+                  WHEN 'Negosiasi' THEN 2 WHEN 'Berjalan'  THEN 3
+                  WHEN 'Tertunda'  THEN 3 ELSE 4 END)
+          THEN p.start_date
+          ELSE NULL
+        END,
+        t.sort_order
+      FROM projects p
+      JOIN activity_templates t ON t.type_code = p.type;
+
+      UPDATE projects SET progress_mode = 'manual';
+    `);
+
     // Riwayat paling akhir: menunjuk ke projects dan users sekaligus.
     for (const e of progressHistory) {
       insertProgress.run(
@@ -462,6 +499,9 @@ export function seed(db: DatabaseSync, options: { force?: boolean } = {}): SeedH
     planSteps: planSteps.length,
     planProspects: planProspects.length,
     planOutputs: planOutputs.length,
+    // Diturunkan dari template, jadi jumlahnya dihitung bukan ditebak.
+    activities: (db.prepare("SELECT COUNT(*) AS n FROM project_activities").get() as { n: number })
+      .n,
     dilewati: false,
   };
 }

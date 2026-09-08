@@ -20,6 +20,7 @@ function p(
     status: "Berjalan",
     priority,
     priorityMode: "auto",
+    progressMode: "auto",
     progressPct: 0,
     clientOrg: "PT Uji",
     locationCity: "",

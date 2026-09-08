@@ -1,6 +1,14 @@
 import { daysUntil } from "./ui";
+import { tindakLanjutTerlewat } from "./activities";
+import type { ProjectActivity } from "./types";
 import { isOverlapping, toDay } from "./timeline";
 import { isActiveStatus, type ProgressEntry, type Project } from "./types";
+
+/** Aktivitas beserta proyeknya — bentuk yang dibutuhkan deteksi tindak lanjut. */
+type ActivityLike = Pick<
+  ProjectActivity,
+  "projectId" | "name" | "weight" | "status" | "slaDays" | "targetDate" | "doneDate" | "sortOrder"
+>;
 
 /* Notifikasi tidak disimpan sebagai tabel sendiri: semuanya diturunkan dari
    keadaan proyek saat ini. Konsekuensinya notifikasi tidak pernah basi — begitu
@@ -10,7 +18,12 @@ import { isActiveStatus, type ProgressEntry, type Project } from "./types";
    ponytail: kalau nanti perlu status dibaca/diabaikan per pengguna, tabelnya
    cukup menyimpan id notifikasi + pengguna, bukan menyalin isinya. */
 
-export type NotificationKind = "terlambat" | "segera" | "mandek" | "bentrok";
+export type NotificationKind =
+  | "terlambat"
+  | "segera"
+  | "mandek"
+  | "bentrok"
+  | "tindak-lanjut";
 
 export type NotificationSeverity = "tinggi" | "sedang" | "info";
 
@@ -40,6 +53,7 @@ export const KIND_LABELS: Record<NotificationKind, string> = {
   segera: "Segera jatuh tempo",
   mandek: "Tidak ada kabar",
   bentrok: "Bentrok jadwal",
+  "tindak-lanjut": "Perlu ditindaklanjuti",
 };
 
 /**
@@ -52,6 +66,7 @@ const KIND_ANCHORS: Record<NotificationKind, string> = {
   segera: "progres-heading",
   mandek: "riwayat-heading",
   bentrok: "bentrok-heading",
+  "tindak-lanjut": "aktivitas-heading",
 };
 
 /** Tautan tujuan sebuah notifikasi. */
@@ -64,6 +79,12 @@ export type NotificationOptions = {
   today?: string;
   staleDays?: number;
   soonDays?: number;
+  /**
+   * Aktivitas per proyek, untuk mendeteksi tenggat tindak lanjut yang lewat —
+   * misalnya penawaran yang berlaku 14 hari tapi tidak berlanjut ke negosiasi.
+   * Tidak diberikan berarti jenis notifikasi itu dilewati.
+   */
+  activities?: ActivityLike[];
 };
 
 /**
@@ -90,8 +111,33 @@ export function buildNotifications(
     if (!sebelumnya || e.createdAt > sebelumnya) terakhir.set(e.projectId, e.createdAt);
   }
 
+  // Aktivitas dikelompokkan per proyek sekali di depan, bukan disaring ulang
+  // di dalam perulangan.
+  const aktivitasProyek = new Map<number, ActivityLike[]>();
+  for (const a of options.activities ?? []) {
+    const isi = aktivitasProyek.get(a.projectId);
+    if (isi) isi.push(a);
+    else aktivitasProyek.set(a.projectId, [a]);
+  }
+
   for (const p of aktif) {
     const sisa = daysUntil(p.deadline, asOf);
+
+    // Tenggat tindak lanjut yang lewat — mis. penawaran berlaku 14 hari dan
+    // belum berlanjut. Padam sendiri begitu aktivitas berikutnya dicentang.
+    for (const t of tindakLanjutTerlewat(aktivitasProyek.get(p.id) ?? [], asOf)) {
+      hasil.push({
+        id: `tindak-lanjut-${p.id}-${t.name}`,
+        kind: "tindak-lanjut",
+        severity: t.lewatHari > 7 ? "tinggi" : "sedang",
+        projectId: p.id,
+        projectName: p.name,
+        ownerId: p.ownerId,
+        title: `Tindak lanjut lewat ${t.lewatHari} hari`,
+        detail: `"${t.name}" selesai ${t.doneDate}, batas tindak lanjutnya ${t.jatuhTempo}.`,
+        date: t.jatuhTempo,
+      });
+    }
 
     if (sisa < 0) {
       hasil.push({

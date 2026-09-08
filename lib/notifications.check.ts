@@ -4,7 +4,12 @@
  */
 import assert from "node:assert/strict";
 import { SOON_DAYS, STALE_DAYS, buildNotifications, countBySeverity } from "./notifications";
-import type { ProgressEntry, Project } from "./types";
+import type { ProgressEntry, Project, ProjectActivity } from "./types";
+
+type Aktivitas = Pick<
+  ProjectActivity,
+  "projectId" | "name" | "weight" | "status" | "slaDays" | "targetDate" | "doneDate" | "sortOrder"
+>;
 
 const HARI_INI = "2026-08-28";
 
@@ -17,6 +22,7 @@ function p(id: number, over: Partial<Project> = {}): Project {
     status: "Berjalan",
     priority: "Sedang",
     priorityMode: "auto",
+    progressMode: "auto",
     progressPct: 50,
     clientOrg: "PT Uji",
     locationCity: "",
@@ -119,6 +125,61 @@ assert.equal(bentrok.length, 1);
 assert.equal(bentrok[0].severity, "info");
 // Id pasangan selalu urut naik, jadi tidak tergantung urutan masukan.
 assert.equal(bentrok[0].id, "bentrok-1-2");
+
+/* --- Tindak lanjut ---------------------------------------------------------- */
+
+const aktivitas = (over: Partial<Aktivitas> = {}): Aktivitas => ({
+  projectId: 1,
+  name: "Penawaran dikirim",
+  weight: 20,
+  status: "Penawaran",
+  slaDays: 14,
+  targetDate: null,
+  doneDate: "2026-08-01",
+  sortOrder: 1,
+  ...over,
+});
+
+// Penawaran selesai 1 Agu, berlaku 14 hari -> jatuh tempo 15 Agu, lewat 13 hari.
+const tindak = buildNotifications([p(1)], segar, {
+  today: HARI_INI,
+  activities: [aktivitas()],
+});
+assert.equal(tindak.length, 1);
+assert.equal(tindak[0].kind, "tindak-lanjut");
+assert.equal(tindak[0].projectId, 1);
+assert.match(tindak[0].title, /13 hari/);
+assert.match(tindak[0].detail, /Penawaran dikirim/);
+// Lewat lebih dari sepekan naik ke tingkat tinggi.
+assert.equal(tindak[0].severity, "tinggi");
+
+// Baru lewat sedikit tetap sedang.
+const baruLewat = buildNotifications([p(1)], segar, {
+  today: "2026-08-18",
+  activities: [aktivitas()],
+});
+assert.equal(baruLewat[0].severity, "sedang");
+
+// Padam begitu aktivitas berikutnya dicentang — urusannya sudah berlanjut.
+assert.deepEqual(
+  buildNotifications([p(1)], segar, {
+    today: HARI_INI,
+    activities: [
+      aktivitas(),
+      aktivitas({ name: "Negosiasi", status: "Negosiasi", sortOrder: 2, slaDays: null, doneDate: "2026-08-20" }),
+    ],
+  }),
+  []
+);
+
+// Aktivitas milik proyek lain tidak pernah nyasar ke proyek ini.
+assert.deepEqual(
+  buildNotifications([p(1)], segar, { today: HARI_INI, activities: [aktivitas({ projectId: 99 })] }),
+  []
+);
+
+// Tanpa daftar aktivitas, jenis ini dilewati begitu saja.
+assert.deepEqual(susun([p(1)]), []);
 
 // Urutan: tingkat tinggi lebih dulu, lalu yang paling lama menunggu.
 // PIC dibuat berbeda supaya yang diuji murni urutan tenggat, bukan bentrok.

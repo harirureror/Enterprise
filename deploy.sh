@@ -35,19 +35,34 @@ echo "==> Sesudah: $(git log --oneline -1)"
 echo "==> Memasang dependensi (termasuk devDependencies)"
 NODE_ENV=development npm ci --include=dev --no-audit --no-fund >/dev/null
 
-# Build lama disingkirkan, bukan dihapus: proses yang sedang berjalan masih
-# memegang berkasnya, dan kalau build baru gagal kita masih bisa kembali.
-rm -rf .next.bak
-[ -d .next ] && mv .next .next.bak
-
-# LANGKAH BUILD — di sini NODE_ENV=production dan APP_BASE_PATH memang perlu.
-# Dibaca dari .env.production supaya nilainya satu sumber dengan yang dipakai
-# PM2 dan nginx; kalau ketiganya berselisih, asetnya menunjuk ke tempat yang
-# salah dan halamannya rusak tanpa pesan galat.
+# NODE_ENV=production dan APP_BASE_PATH dibaca dari .env.production supaya
+# nilainya satu sumber dengan yang dipakai PM2 dan nginx; kalau ketiganya
+# berselisih, asetnya menunjuk ke tempat yang salah dan halamannya rusak tanpa
+# pesan galat. Dibaca SESUDAH npm ci, karena NODE_ENV=production di sinilah
+# yang dulu membuat devDependencies dilewati.
 set -a
 # shellcheck disable=SC1091
 . ./.env.production
 set +a
+
+# LANGKAH MIGRASI — sebelum build, dan karenanya sebelum .next disentuh sama
+# sekali. Migrasi yang gagal harus meninggalkan versi lama berjalan utuh, dan
+# itu hanya mungkin kalau belum ada yang dibongkar. Migrasi bersifat menambah,
+# jadi kode lama yang masih melayani permintaan tidak terganggu olehnya.
+echo "==> Mencadangkan database dulu"
+./backup-db.sh
+
+echo "==> Menerapkan migrasi database"
+if ! npm run db:setup; then
+  echo "!!! Migrasi GAGAL — tidak ada yang dibongkar, versi lama tetap melayani"
+  echo "!!! Cadangan sebelum migrasi ada di /srv/enterprise-backup"
+  exit 1
+fi
+
+# Build lama disingkirkan, bukan dihapus: proses yang sedang berjalan masih
+# memegang berkasnya, dan kalau build baru gagal kita masih bisa kembali.
+rm -rf .next.bak
+[ -d .next ] && mv .next .next.bak
 
 echo "==> Build (APP_BASE_PATH=${APP_BASE_PATH:-<kosong>})"
 if ! npm run build; then

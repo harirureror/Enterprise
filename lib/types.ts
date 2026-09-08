@@ -227,6 +227,8 @@ export type Project = {
    */
   priority: ProjectPriority;
   priorityMode: PriorityMode;
+  /** "auto" berarti progressPct dihitung dari checklist aktivitas. */
+  progressMode: ProgressMode;
   progressPct: number;
   /** Instansi pemberi kerja — satu-satunya kolom klien yang wajib diisi. */
   clientOrg: string;
@@ -285,6 +287,47 @@ export type ProjectDependency = {
 };
 
 /** Satu baris riwayat progres — padanan tabel PROGRESS_HISTORY di PRD. */
+/** Meniru PriorityMode: dihitung sistem, kecuali sengaja dikunci. */
+export type ProgressMode = "auto" | "manual";
+
+/**
+ * Satu langkah alur kerja proyek.
+ *
+ * Menggantikan progres yang diketik: yang tercentang menentukan progres DAN
+ * status, sehingga angka di layar selalu punya pekerjaan nyata di belakangnya.
+ */
+export type ProjectActivity = {
+  id: number;
+  projectId: number;
+  name: string;
+  /** Sumbangan ke progres, 0-100. Jumlah seluruh aktivitas idealnya 100. */
+  weight: number;
+  /** Status proyek yang berlaku begitu aktivitas ini selesai. */
+  status: ProjectStatus;
+  /**
+   * Berapa hari sesudah aktivitas ini selesai, tindak lanjut jatuh tempo.
+   * `null` berarti tidak ada tenggat. Contoh: penawaran berlaku 14 hari.
+   */
+  slaDays: number | null;
+  /** ISO date; menggambar garis RENCANA di kurva S. */
+  targetDate: string | null;
+  /** ISO date; `null` berarti belum selesai. Menggambar garis AKTUAL. */
+  doneDate: string | null;
+  doneBy: number | null;
+  sortOrder: number;
+};
+
+/** Baris template per jenis proyek; disalin ke proyek saat dibuat. */
+export type ActivityTemplate = {
+  id: number;
+  typeCode: string;
+  name: string;
+  weight: number;
+  status: ProjectStatus;
+  slaDays: number | null;
+  sortOrder: number;
+};
+
 export type ProgressEntry = {
   id: number;
   projectId: number;

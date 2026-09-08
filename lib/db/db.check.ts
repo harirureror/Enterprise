@@ -117,6 +117,8 @@ assert.deepEqual(kolom, [
   // Lokasi klien dipecah jadi dua kolom, migrasi 12.
   "location_city",
   "location_province",
+  // Kunci progres manual, migrasi 17 — meniru priority_mode.
+  "progress_mode",
 ]);
 
 // Seed memasukkan seluruh data awal.
@@ -132,6 +134,7 @@ assert.equal(jumlah.plans, mockPlans.length);
 assert.equal(jumlah.planSteps, mockPlanSteps.length);
 assert.equal(jumlah.planProspects, mockPlanProspects.length);
 assert.equal(jumlah.planOutputs, mockPlanOutputs.length);
+assert.ok(jumlah.activities > 0, "proyek contoh dibekali checklist");
 
 const hitung = (sql: string) => Number(db.prepare(sql).get()!.n);
 assert.equal(hitung("SELECT COUNT(*) AS n FROM users"), mockUsers.length);
@@ -1177,6 +1180,108 @@ assert.ok(indeksRencana.includes("idx_plan_prospects_plan"));
 assert.ok(indeksRencana.includes("idx_plan_comments_plan"));
 assert.ok(indeksRencana.includes("idx_plan_outputs_plan"));
 assert.ok(indeksRencana.includes("idx_plan_outputs_project"));
+
+
+/* --- Checklist aktivitas dan kurva S ---------------------------------------- */
+
+// Seluruh proyek contoh masuk terkunci manual: checklist hasil terkaan tidak
+// boleh diam-diam menimpa angka progres yang ditulis orang.
+assert.equal(hitung("SELECT COUNT(*) AS n FROM projects WHERE progress_mode <> 'manual'"), 0);
+
+// Template terisi untuk keempat jenis, dan bobot tiap jenis berjumlah 100 —
+// daftar yang tidak genap akan membuat proyek baru mentok di bawah 100%.
+const bobotJenis = db
+  .prepare("SELECT type_code, SUM(weight) AS total FROM activity_templates GROUP BY type_code")
+  .all();
+assert.equal(bobotJenis.length, PROJECT_TYPES.length);
+for (const baris of bobotJenis) {
+  assert.equal(Number(baris.total), 100, `bobot template ${baris.type_code} harus 100`);
+}
+
+// Backfill menandai selesai persis aktivitas sampai tahap status proyeknya.
+const contoh = db
+  .prepare(
+    `SELECT p.status, a.status AS aktivitas, a.done_date
+     FROM projects p JOIN project_activities a ON a.project_id = p.id
+     WHERE p.status = 'Negosiasi'`
+  )
+  .all();
+assert.ok(contoh.length > 0, "ada proyek contoh berstatus Negosiasi");
+for (const baris of contoh) {
+  const sudah = baris.done_date !== null;
+  const seharusnya = ["Prospect", "Penawaran", "Negosiasi"].includes(String(baris.aktivitas));
+  assert.equal(sudah, seharusnya, `aktivitas ${baris.aktivitas} pada proyek Negosiasi`);
+}
+
+// target_date sengaja kosong: tanpa rencana yang disusun orang, garis rencana
+// di kurva S hanya akan jadi karangan.
+assert.equal(hitung("SELECT COUNT(*) AS n FROM project_activities WHERE target_date IS NOT NULL"), 0);
+
+// Jenis di luar keempat kategori ditolak database, sama seperti projects.type.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO activity_templates (type_code, name, weight, status)
+       VALUES ('Konsultasi', 'Jenis asing', 10, 'Berjalan')`
+    ),
+  "jenis template di luar daftar harus ditolak"
+);
+
+// Bobot dan tenggat dijaga di tingkat kolom, bukan hanya di formulir.
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO project_activities (project_id, name, weight, status)
+       VALUES (1, 'Bobot mustahil', 140, 'Berjalan')`
+    ),
+  "bobot di luar 0-100 harus ditolak"
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO project_activities (project_id, name, weight, status, sla_days)
+       VALUES (1, 'Tenggat nol', 10, 'Berjalan', 0)`
+    ),
+  "tenggat tindak lanjut nol hari harus ditolak"
+);
+assert.throws(
+  () =>
+    db.exec(
+      `INSERT INTO projects (name, type, status, priority, progress_pct, start_date, deadline,
+                             owner_id, progress_mode)
+       VALUES ('Mode asing', 'Jasa', 'Berjalan', 'Sedang', 0, '2026-01-01', '2026-02-01', 1, 'otomatis')`
+    ),
+  "progress_mode di luar auto/manual harus ditolak"
+);
+
+// Menghapus proyek membawa serta checklistnya — tidak ada aktivitas menggantung.
+const proyekUji = Number(
+  db
+    .prepare(
+      `INSERT INTO projects (name, type, status, priority, progress_pct, start_date, deadline, owner_id)
+       VALUES ('Proyek uji aktivitas', 'Jasa', 'Berjalan', 'Sedang', 0, '2026-01-01', '2026-02-01', 1)
+       RETURNING id`
+    )
+    .get()!.id
+);
+db.exec(
+  `INSERT INTO project_activities (project_id, name, weight, status, done_by)
+   VALUES (${proyekUji}, 'Aktivitas uji', 10, 'Berjalan', 1)`
+);
+assert.equal(hitung(`SELECT COUNT(*) AS n FROM project_activities WHERE project_id = ${proyekUji}`), 1);
+
+db.exec(`DELETE FROM projects WHERE id = ${proyekUji}`);
+assert.equal(hitung(`SELECT COUNT(*) AS n FROM project_activities WHERE project_id = ${proyekUji}`), 0);
+
+const indeksAktivitas = db
+  .prepare(
+    `SELECT name FROM sqlite_master WHERE type = 'index'
+     AND tbl_name IN ('activity_templates', 'project_activities')`
+  )
+  .all()
+  .map((r) => String(r.name));
+assert.ok(indeksAktivitas.includes("idx_activity_templates_type"));
+assert.ok(indeksAktivitas.includes("idx_project_activities_project"));
 
 db.close();
 

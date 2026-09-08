@@ -4,10 +4,13 @@ import {
   PROJECT_TYPES,
   isActiveStatus,
   type AccessLevel,
+  type ActivityTemplate,
   type AgendaEntry,
   type PlanComment,
   type PlanOutput,
   type PlanProspect,
+  type ProgressMode,
+  type ProjectActivity,
   type PlanStep,
   type ProgressEntry,
   type Project,
@@ -23,6 +26,14 @@ import {
   type User,
 } from "./types";
 import { type ProjectFilter, filterProjects } from "./filters";
+import {
+  type TitikKurva,
+  kurvaS,
+  progresDariAktivitas,
+  selisihRencana,
+  statusDariAktivitas,
+  totalBobot,
+} from "./activities";
 import * as store from "./db/store";
 import {
   type Coverage,
@@ -245,6 +256,12 @@ export type ProjectDetail = {
   dependencies: DependencyView;
   /** Proyek lain yang boleh ditahan proyek ini (semua kecuali dirinya sendiri). */
   dependencyCandidates: Project[];
+  /** Checklist aktivitas, menurut urutannya. */
+  activities: ProjectActivity[];
+  /** Kurva S yang diturunkan dari checklist itu. */
+  curva: CurvaS;
+  /** Ada template untuk jenis proyek ini, jadi tombol "pakai template" berguna. */
+  adaTemplate: boolean;
 };
 
 /** Isi halaman detail proyek: proyeknya, PIC-nya, dan bentrok jadwalnya. */
@@ -284,6 +301,9 @@ export async function getProjectDetail(id: number): Promise<ProjectDetail | null
     comments: await getComments(id),
     dependencies: await getDependencies(id),
     dependencyCandidates: projects.filter((p) => p.id !== id),
+    activities: store.projectActivities.byProject(id),
+    curva: await getCurvaS(id),
+    adaTemplate: store.activityTemplates.byType(project.type).length > 0,
   };
 }
 
@@ -895,7 +915,9 @@ export type NotificationFeed = {
  * ponytail: fase database tinggal ganti sumbernya jadi query, aturannya tetap.
  */
 export async function getNotifications(): Promise<NotificationFeed> {
-  const items = buildNotifications(await getProjects(), store.progress.all());
+  const items = buildNotifications(await getProjects(), store.progress.all(), {
+    activities: store.projectActivities.all(),
+  });
   return { items, counts: countBySeverity(items), total: items.length };
 }
 
@@ -1074,6 +1096,202 @@ export async function deleteAgendaEntries(
   return { ok: true, jumlah: store.agenda.removeMany(ids) };
 }
 
+
+
+/* --- Checklist aktivitas dan kurva S ---------------------------------------- */
+
+export async function getActivityTemplates(typeCode?: string): Promise<ActivityTemplate[]> {
+  return typeCode === undefined
+    ? store.activityTemplates.all()
+    : store.activityTemplates.byType(typeCode);
+}
+
+export async function createActivityTemplate(
+  typeCode: string,
+  input: Omit<ActivityTemplate, "id" | "typeCode" | "sortOrder">
+): Promise<ActivityTemplate> {
+  return store.activityTemplates.insert({
+    ...input,
+    typeCode,
+    sortOrder: store.activityTemplates.nextSortOrder(typeCode),
+  });
+}
+
+export async function updateActivityTemplate(
+  id: number,
+  input: Omit<ActivityTemplate, "id" | "typeCode">
+): Promise<ActivityTemplate | null> {
+  return store.activityTemplates.update(id, input);
+}
+
+export async function deleteActivityTemplate(id: number): Promise<boolean> {
+  return store.activityTemplates.remove(id);
+}
+
+export async function getProjectActivities(projectId: number): Promise<ProjectActivity[]> {
+  return store.projectActivities.byProject(projectId);
+}
+
+export async function getProjectActivity(id: number): Promise<ProjectActivity | null> {
+  return store.projectActivities.byId(id);
+}
+
+/**
+ * Hitung ulang progres dan status dari checklist, lalu simpan.
+ *
+ * Tidak melakukan apa pun kalau proyeknya dikunci `manual` — itulah gunanya
+ * kunci. Mengembalikan progres yang berlaku supaya pemanggil bisa mencatat
+ * riwayatnya tanpa membaca ulang.
+ */
+async function hitungUlangProgres(
+  projectId: number
+): Promise<{ progressPct: number; status: ProjectStatus; berubah: boolean } | null> {
+  const project = store.projects.byId(projectId);
+  if (!project) return null;
+
+  if (project.progressMode !== "auto") {
+    return { progressPct: project.progressPct, status: project.status, berubah: false };
+  }
+
+  const activities = store.projectActivities.byProject(projectId);
+  const progressPct = progresDariAktivitas(activities);
+  const status = statusDariAktivitas(activities, project.status);
+  const berubah = progressPct !== project.progressPct || status !== project.status;
+
+  if (berubah) store.projectActivities.terapkanProgres(projectId, progressPct, status);
+  return { progressPct, status, berubah };
+}
+
+/**
+ * Centang atau lepas centang satu aktivitas.
+ *
+ * Progres dan status ikut dihitung ulang, dan perubahannya dicatat di
+ * progress_history — supaya riwayat tetap satu-satunya sumber cerita perubahan
+ * progres, dari mana pun perubahan itu datang.
+ */
+export async function setActivityDone(
+  id: number,
+  done: boolean,
+  userId: number,
+  hariIni?: string
+): Promise<{ ok: true; activity: ProjectActivity } | { ok: false; error: string }> {
+  const lama = store.projectActivities.byId(id);
+  if (!lama) return { ok: false, error: "Aktivitas tidak ditemukan." };
+
+  const tanggal = hariIni ?? new Date().toISOString().slice(0, 10);
+  const activity = store.projectActivities.update(id, {
+    ...lama,
+    doneDate: done ? lama.doneDate ?? tanggal : null,
+    doneBy: done ? lama.doneBy ?? userId : null,
+  });
+  if (!activity) return { ok: false, error: "Aktivitas tidak ditemukan." };
+
+  const hasil = await hitungUlangProgres(lama.projectId);
+  if (hasil?.berubah) {
+    const sekarang = new Date().toISOString();
+    store.progress.insert({
+      projectId: lama.projectId,
+      userId,
+      progressPct: hasil.progressPct,
+      note: `${done ? "Selesai" : "Dibuka lagi"}: ${lama.name}`,
+      createdAt: sekarang.slice(0, 10),
+      recordedAt: `${sekarang.slice(0, 10)} ${sekarang.slice(11, 19)}`,
+    });
+  }
+
+  return { ok: true, activity };
+}
+
+export async function createProjectActivity(
+  projectId: number,
+  input: Omit<ProjectActivity, "id" | "projectId" | "sortOrder">
+): Promise<ProjectActivity | null> {
+  if (store.projects.byId(projectId) === null) return null;
+
+  const activity = store.projectActivities.insert({
+    ...input,
+    projectId,
+    sortOrder: store.projectActivities.nextSortOrder(projectId),
+  });
+  await hitungUlangProgres(projectId);
+  return activity;
+}
+
+export async function updateProjectActivity(
+  id: number,
+  input: Omit<ProjectActivity, "id" | "projectId">
+): Promise<ProjectActivity | null> {
+  const lama = store.projectActivities.byId(id);
+  if (!lama) return null;
+
+  const activity = store.projectActivities.update(id, input);
+  await hitungUlangProgres(lama.projectId);
+  return activity;
+}
+
+export async function deleteProjectActivity(id: number): Promise<boolean> {
+  const lama = store.projectActivities.byId(id);
+  if (!lama) return false;
+
+  const hapus = store.projectActivities.remove(id);
+  if (hapus) await hitungUlangProgres(lama.projectId);
+  return hapus;
+}
+
+/** Bekali proyek dengan salinan template jenisnya. Menolak kalau sudah ada isinya. */
+export async function applyTemplateToProject(
+  projectId: number
+): Promise<{ ok: true; jumlah: number } | { ok: false; error: string }> {
+  const project = store.projects.byId(projectId);
+  if (!project) return { ok: false, error: "Proyek tidak ditemukan." };
+
+  if (store.projectActivities.byProject(projectId).length > 0) {
+    // Menimpa diam-diam akan menghapus tanggal selesai yang sudah dicatat orang.
+    return { ok: false, error: "Proyek ini sudah punya daftar aktivitas." };
+  }
+
+  const jumlah = store.projectActivities.copyTemplateTo(projectId, project.type);
+  if (jumlah === 0) {
+    return { ok: false, error: `Belum ada template aktivitas untuk jenis ${project.type}.` };
+  }
+
+  await hitungUlangProgres(projectId);
+  return { ok: true, jumlah };
+}
+
+/**
+ * Kunci progres ke angka manual, atau kembalikan ke perhitungan checklist.
+ *
+ * Kembali ke "auto" langsung menghitung ulang: membiarkan angka lama bertahan
+ * sesudah kuncinya dilepas akan menampilkan progres yang tidak dijamin siapa pun.
+ */
+export async function setProgressMode(
+  projectId: number,
+  mode: ProgressMode
+): Promise<Project | null> {
+  const project = store.projects.byId(projectId);
+  if (!project) return null;
+
+  store.projects.update(projectId, { ...project, progressMode: mode });
+  if (mode === "auto") await hitungUlangProgres(projectId);
+  return store.projects.byId(projectId);
+}
+
+export type CurvaS = {
+  titik: TitikKurva[];
+  /** Positif berarti mendahului rencana, negatif tertinggal. */
+  selisih: number | null;
+  totalBobot: number;
+};
+
+export async function getCurvaS(projectId: number, hariIni?: string): Promise<CurvaS> {
+  const activities = store.projectActivities.byProject(projectId);
+  return {
+    titik: kurvaS(activities, hariIni),
+    selisih: selisihRencana(activities, hariIni),
+    totalBobot: totalBobot(activities),
+  };
+}
 
 /* --- Rencana strategis ----------------------------------------------------- */
 

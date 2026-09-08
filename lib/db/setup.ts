@@ -26,6 +26,6 @@ console.log(
       `${jumlah.progress} riwayat, ${jumlah.reminders} pengingat, ${jumlah.schedules} jadwal, ` +
       `${jumlah.comments} komentar, ${jumlah.dependencies} ketergantungan, ${jumlah.agenda} agenda, ` +
       `${jumlah.plans} rencana, ${jumlah.planSteps} langkah, ${jumlah.planProspects} prospek, ` +
-      `${jumlah.planOutputs} luaran`
+      `${jumlah.planOutputs} luaran, ${jumlah.activities} aktivitas`
 );
 console.log(`Database: ${DB_PATH}`);

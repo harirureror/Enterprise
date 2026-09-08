@@ -332,6 +332,11 @@ tanpa pencocokan kira-kira. Jadi "Kepri" dan "Kepulauan Riau" tampil sebagai dua
 Itu masalah keseragaman pengisian yang perlu **terlihat**, bukan disembunyikan
 penggabungan otomatis yang bisa saja salah.
 
+Ringkasan ini tampil sebagai **tabel**, bukan deretan chip: kolom Wilayah · Proyek ·
+Rencana · Prospek · Keterangan bisa dibaca menurun dan dibandingkan antarbaris.
+Chip memaksa mata melompat-lompat untuk membandingkan angka yang justru ada untuk
+dibandingkan.
+
 ### Progres dihitung, tidak diketik
 
 Progres rencana diturunkan dari langkah-langkahnya, dengan alasan yang sama seperti
@@ -344,11 +349,27 @@ Nomor urut (`sort_order`) adalah kunci pengurutan, bukan nomor yang ditampilkan;
 di layar dan di laporan dihitung dari posisinya, sehingga tetap rapat walau ada langkah
 yang dihapus di tengah.
 
-### Kaitan rencana ↔ proyek
+### Luaran: bukan hanya proyek yang lahir
 
-Satu rencana bisa melahirkan beberapa proyek, dan satu proyek bisa melayani lebih dari
-satu rencana. Menghapus proyek **hanya memutus kaitannya** — rencananya tetap ada,
-sehingga arah divisi tidak ikut hilang saat daftar proyek dirapikan.
+Rencana tidak selalu melahirkan proyek. Riset melahirkan **jurnal**, kegiatan
+melahirkan **portofolio**, pelatihan melahirkan **sertifikasi**, dan sebagiannya jadi
+**produk** yang dijual berulang. Kalau yang tercatat hanya proyek, sebagian besar hasil
+kerja divisi tidak punya tempat, dan rencana yang berhasil terlihat seperti rencana
+yang mandek.
+
+Karena itu ada satu daftar **Luaran** dengan lima jenis tertutup — `Jurnal`,
+`Portofolio`, `Sertifikasi`, `Produk`, `Proyek Turunan` — dan proyek jadi salah satu
+jenisnya, bukan kategori tersendiri. Rantainya terbaca sebagai satu daftar:
+rencana → luaran → proyek turunan.
+
+Pemilih proyek hanya muncul saat jenisnya `Proyek Turunan`; berpindah ke jenis lain
+melepas tautannya, karena kaitan yang tersimpan tanpa terlihat lebih buruk daripada
+tidak ada kaitan.
+
+Menghapus proyek **hanya memutus tautannya** (`ON DELETE SET NULL`): baris luarannya
+tetap ada dan tertulis "proyek sudah dihapus". Ini lebih kuat daripada bentuk lamanya,
+yang membuat kaitannya ikut lenyap — catatan bahwa sebuah rencana pernah melahirkan
+proyek tidak boleh hilang saat daftar proyek dirapikan.
 
 ### Agenda digabung
 
@@ -382,8 +403,8 @@ yang tersimpan.
 ### Ekspor
 
 Jenis ekspor tersendiri (`scope: "rencana"`), memakai ketiga perender Excel/Word/PDF
-yang sudah ada. Excel mendapat empat lembar: **Rencana**, **Langkah**, **Prospek**,
-dan **Jangkauan**. Tidak ada kolom keuangan sama sekali di ekspor ini, jadi penyaringan
+yang sudah ada. Excel mendapat lima lembar: **Rencana**, **Langkah**, **Prospek**,
+**Jangkauan**, dan **Luaran**. Tidak ada kolom keuangan sama sekali di ekspor ini, jadi penyaringan
 `lihat-keuangan` memang tidak berlaku — ditulis eksplisit di kode dan dikunci satu
 assertion supaya tidak terbaca sebagai kelalaian.
 
@@ -592,6 +613,106 @@ mengubah agenda, hanya cara lain untuk memintanya.
 
 ---
 
+## 3g. Checklist Aktivitas & Kurva S
+
+Sampai versi ini, `progress_pct` adalah **angka yang diketik orang**. Tidak ada yang
+menghubungkannya dengan pekerjaan yang benar-benar selesai, tidak ada cara melihat
+apakah sebuah proyek tertinggal dari rencananya, dan tidak ada yang mengingatkan saat
+penawaran kedaluwarsa tanpa ditindaklanjuti. Tiga hal itu satu masalah yang sama:
+kemajuan proyek tidak punya sumber selain ingatan.
+
+### Aktivitas sebagai satu-satunya sumber
+
+Tiap proyek punya daftar aktivitas bernomor urut. Tiap aktivitas membawa **bobot**
+(sumbangannya ke progres), **status** yang berlaku begitu ia selesai, **tanggal target**
+(opsional), dan **tenggat tindak lanjut** dalam hari (opsional).
+
+Dari daftar itu diturunkan dua angka yang selama ini diketik:
+
+- **Progres** = jumlah bobot yang tercentang ÷ **total bobot**, dibulatkan. Pembaginya
+  total bobot sebenarnya, bukan 100: daftar yang bobotnya belum genap tetap bisa
+  mencapai 100% kalau semuanya selesai. Kalau dibagi 100, proyek yang daftarnya baru
+  terisi separuh akan selamanya mentok di bawah 100% dan orang akan mengira ada yang
+  tertinggal padahal tidak.
+- **Status** = status aktivitas selesai **terakhir** menurut urutan. Belum ada yang
+  tercentang berarti status tidak diubah — proyek baru tetap di status awalnya, bukan
+  dilempar mundur ke tahap pertama template.
+
+Kolom `projects.status` **tetap ada dan tetap dipakai** seluruh penyaring, ekspor,
+notifikasi, dan skor prioritas (§3a, parameter "Tahap Pipeline" hasil kesepakatan tim).
+Yang berubah hanya siapa yang mengisinya.
+
+### `progress_mode`: auto atau manual
+
+Meniru `priority_mode` yang sudah ada. `auto` berarti progres dan status dihitung dari
+checklist; `manual` berarti keduanya dikunci ke angka yang ditulis orang lewat form
+"Catat progres" — yang kini hanya muncul pada proyek `manual`, karena menawarkan isian
+yang akan langsung ditimpa perhitungan itu menyesatkan.
+
+**Seluruh proyek yang sudah ada masuk sebagai `manual`.** Checklist mereka diisi
+otomatis dari statusnya saat migrasi, dan tebakan itu tidak boleh diam-diam menimpa
+angka yang ditulis orang. Menekan "Hitung dari checklist" langsung menghitung ulang —
+membiarkan angka lama bertahan sesudah kuncinya dilepas akan menampilkan progres yang
+tidak dijamin siapa pun.
+
+### Template per jenis proyek
+
+Alur kerja Riset dan Penjualan jauh berbeda, jadi tiap jenis punya daftarnya sendiri,
+disunting di **Kelola Jenis Proyek**. Template **disalin** ke proyek, bukan dirujuk:
+mengubah template tidak boleh menggeser progres proyek yang sudah berjalan. Setelah
+disalin, nama, bobot, tanggal, dan tenggatnya bebas disesuaikan per proyek.
+
+Bawaannya empat alur, masing-masing berjumlah 100: Penjualan (5 langkah), Jasa (7),
+Training (5), Riset (6).
+
+### Kurva S
+
+SVG inline, tanpa pustaka grafik — sejalan dengan `TimelineChart` yang memakai div
+berposisi. Dua garis:
+
+- **Rencana** — bobot kumulatif menurut `target_date`. Bernilai kosong dan **tidak
+  digambar sama sekali** kalau tidak ada satu pun tanggal target. Tanpa rencana yang
+  benar-benar disusun orang, garisnya cuma karangan.
+- **Aktual** — bobot kumulatif menurut `done_date`, dan **berhenti di hari ini**.
+  Menariknya sampai ujung rentang akan menggambar masa depan yang belum terjadi, dan
+  grafik yang menjanjikan hal seperti itu lebih buruk daripada grafik yang berhenti
+  apa adanya.
+
+Selisih keduanya pada hari ini ditulis sebagai kalimat ("Tertinggal 15% dari rencana"),
+dan angkanya juga tersedia sebagai tabel di balik "Lihat sebagai tabel" — grafik saja
+tidak bisa dibaca pembaca layar maupun disalin.
+
+Migrasi sengaja **tidak** mengisi `target_date` proyek lama: tanggal target yang
+dikarang akan menghasilkan garis rencana yang terlihat resmi tanpa pernah disepakati.
+
+### Pengingat tindak lanjut
+
+Jenis notifikasi kelima, `tindak-lanjut`, di samping `terlambat`, `segera`, `mandek`,
+dan `bentrok`. Tidak ada tabel, cron, atau pengiriman baru — `buildNotifications()`
+memang sudah menurunkan notifikasi dari keadaan proyek.
+
+Tiga syarat, dan yang ketiga yang paling penting:
+
+1. aktivitasnya punya tenggat tindak lanjut (`sla_days`) dan sudah selesai,
+2. `done_date + sla_days` sudah lewat hari ini,
+3. **aktivitas berikutnya belum selesai.**
+
+Penawaran yang sudah lanjut ke negosiasi tidak perlu diingatkan lagi. Pengingat yang
+menyala setelah urusannya beres akan cepat diabaikan, dan begitu diabaikan seluruh
+pengingat lain ikut kehilangan artinya.
+
+### Yang dibuktikan, bukan diasumsikan
+
+| Yang dibuktikan | Caranya |
+|---|---|
+| Migrasi idempoten, 17 proyek utuh | Dijalankan dua kali di atas salinan database sungguhan; jumlah baris dan seluruh `progress_pct` sama persis |
+| Mode manual menahan | `lib/api.check.ts`: mencentang di proyek `manual` tidak menggeser angka maupun menambah baris riwayat |
+| Centang menggerakkan tiga hal sekaligus | `lib/api.check.ts`: progres bertambah persis sebesar bobotnya, status berpindah, satu baris `progress_history` tercatat |
+| Pengingat menyala **dan padam** | `lib/notifications.check.ts`: menyala saat tenggat lewat, hilang begitu aktivitas berikutnya dicentang |
+| Penegakan di server | Sebagai Anggota, mencentang aktivitas proyek milik orang lain lewat `Next-Action` langsung → ditolak, dan di database `progress_pct` tidak bergeser, `done_date` tetap kosong, riwayat tetap nol. Kontrol positif pada proyeknya sendiri: 0% → 30%, status Penawaran → Negosiasi |
+
+---
+
 ## 4. User Flow
 
 ### Alur Utama Pengguna (Anggota Divisi Enterprise)
@@ -745,6 +866,7 @@ erDiagram
         string priority
         int progress_pct
         string priority_mode
+        string progress_mode
         string client_org
         string client_name
         string client_email
@@ -834,10 +956,42 @@ erDiagram
         datetime updated_at
     }
 
-    PLAN_PROJECTS {
-        int plan_id PK, FK
-        int project_id PK, FK
+    PLAN_OUTPUTS {
+        int id PK
+        int plan_id FK
+        string kind
+        string title
+        int project_id FK
+        string url
+        date achieved_at
+        text note
+        int sort_order
+        datetime updated_at
+    }
+
+    ACTIVITY_TEMPLATES {
+        int id PK
+        string type_code
+        string name
+        int weight
+        string status
+        int sla_days
+        int sort_order
+    }
+
+    PROJECT_ACTIVITIES {
+        int id PK
+        int project_id FK
+        string name
+        int weight
+        string status
+        int sla_days
+        date target_date
+        date done_date
+        int done_by FK
+        int sort_order
         datetime created_at
+        datetime updated_at
     }
 
     PLAN_COMMENTS {
@@ -867,13 +1021,27 @@ erDiagram
 - `tax_type` default `Non PKP` — satu-satunya default yang tidak mengubah angka apa pun. Menebak `PKP` akan memotong sekitar 9,9% dari margin setiap proyek lama tanpa pernah diperiksa orang.  
 - `sales_fee` dan `operational_cost` boleh `NULL` (belum diisi), berbeda dari `0` (memang tidak ada biayanya).  
 - **Margin/profit tidak dikolomkan.** Ia turunan dari `value`, `tax_type`, `sales_fee`, dan `operational_cost`, dihitung di `lib/finance.ts`: untuk PKP, PPN dikeluarkan dulu (`value ÷ 1,11`) karena PPN adalah titipan negara, bukan pendapatan. Menyimpannya berarti ada dua sumber kebenaran yang akan berselisih begitu salah satu komponennya diubah.  
+- Kolom `progress_mode` bernilai `auto` (default) atau `manual`, meniru bentuk
+  `priority_mode`. Pada `auto`, `progress_pct` dan `status` diisi hasil perhitungan
+  `PROJECT_ACTIVITIES`; pada `manual`, keduanya tidak pernah ditimpa sistem. Migrasi
+  yang memperkenalkan kolom ini menyetel **seluruh baris lama ke `manual`** — checklist
+  hasil terkaan tidak boleh diam-diam menimpa angka yang ditulis orang. Lihat §3g.  
+- `ACTIVITY_TEMPLATES.type_code` dijaga `CHECK`, bukan `FOREIGN KEY` ke `project_types`,
+  dengan alasan yang sama seperti `projects.type`: keempat jenis itu tetap dan
+  penegakannya sudah di sana. `FOREIGN KEY` juga akan mengikat migrasinya pada urutan
+  pengisian `project_types`, dan pada database yang benar-benar baru tabel itu masih
+  kosong saat migrasi berjalan.  
+- `PROJECT_ACTIVITIES` adalah **salinan** template, bukan rujukan: mengubah template
+  tidak boleh menggeser progres proyek yang sudah berjalan. `done_by` memakai
+  `ON DELETE SET NULL` — centangnya tetap ada walau orangnya sudah tidak; menghapus
+  **proyek** membawa serta seluruh checklistnya (`CASCADE`).  
 - Kolom `priority_mode` bernilai `auto` (default) atau `manual`. Pada `auto`, kolom `priority` diisi hasil hitungan saat data dibaca; pada `manual`, nilai yang tersimpan tidak pernah ditimpa sistem.  
 - Kolom `client_tier` (`VIP`/`Strategis`/`Reguler`/`Baru`/`Internal`, default `Reguler`) dan `penalty_risk` (`Putus kontrak`/`Denda harian`/`Denda tetap`/`Teguran`/`Tidak ada`, default `Tidak ada`) adalah dua parameter prioritas yang tidak bisa disimpulkan sistem dari data lain — lihat §3a.  
 - Tabel `PROJECT_DEPENDENCIES` mencatat relasi "proyek A menahan proyek B", dengan `blocker_id` sebagai penahan. Kunci primernya gabungan kedua kolom (tidak bisa ganda) dan ada `CHECK` yang menolak proyek menahan dirinya sendiri. Lingkaran (A menahan B sekaligus B menahan A) tidak bisa dijaga SQLite, jadi ditolak di lapisan aplikasi sebelum disimpan.  
 - Tabel `REMINDERS` menyimpan jadwal notifikasi untuk setiap proyek.
 - `STRATEGIC_PLANS` dan turunannya mencatat arah divisi yang **belum berkontrak** — lihat §3e. `owner_id` dan `created_by` memakai `ON DELETE RESTRICT`: nama penyusun melekat di rencana, jadi menghilangkannya diam-diam akan memutus jejak.
 - `PLAN_STEPS.owner_id` memakai `ON DELETE SET NULL` — langkah boleh dibuat sebelum ada yang ditugaskan, dan pekerjaannya tetap ada walau orangnya sudah tidak.
-- Menghapus rencana ikut menghapus langkah, prospek, kaitan proyek, dan komentarnya (`CASCADE`); menghapus **proyek** hanya memutus kaitannya di `PLAN_PROJECTS`, sedangkan rencananya tetap ada.
+- Menghapus rencana ikut menghapus langkah, prospek, luaran, dan komentarnya (`CASCADE`); menghapus **proyek** hanya memutus tautannya di `PLAN_OUTPUTS` (`ON DELETE SET NULL`), sedangkan baris luaran dan rencananya tetap ada — lihat §3e.
 - **Progres rencana tidak dikolomkan.** Ia diturunkan dari `PLAN_STEPS` di `lib/strategy.ts`, dengan alasan yang sama seperti margin: angka yang disimpan akan melenceng dari langkahnya begitu salah satunya berubah.
 - `PLAN_COMMENTS` sengaja tabel sendiri, bukan menumpang `comments`: kolom `project_id` di sana `NOT NULL`, dan melonggarkannya akan memaksa setiap pembaca komentar proyek menangani baris yang bukan miliknya.
 
@@ -921,7 +1089,7 @@ komponen server. Menambah pintu kedua berarti menduakan penjaganya.
 | Sandi | scrypt (`node:crypto`) | |
 | Notifikasi | Dihitung dari keadaan proyek, ditampilkan di aplikasi | Belum ada pengiriman email |
 | Ekspor | `write-excel-file`, `docx`, `pdf-lib` | Ketiganya JavaScript murni |
-| Pengujian | Berkas `*.check.ts` berbasis `assert`, dijalankan `npx tsx` | 30 berkas, tanpa kerangka uji. Tiap modul murni punya berkas ceknya sendiri; jalankan satu-satu atau seluruhnya |
+| Pengujian | Berkas `*.check.ts` berbasis `assert`, dijalankan `npx tsx` | 32 berkas, tanpa kerangka uji. Tiap modul murni punya berkas ceknya sendiri; jalankan satu-satu atau seluruhnya |
 | Hosting | **VPS Ubuntu + PM2 + nginx**, di belakang Cloudflare | Lihat §8a |
 
 **Aplikasi ini tidak bisa dipasang di platform serverless** (Vercel, Netlify,
@@ -977,7 +1145,8 @@ ssh root@157.173.222.69 /srv/enterprise-dashboard/deploy.sh
 ```
 
 Satu perintah. Skrip itu menarik kode dari `origin/main`, memasang dependensi,
-membangun, memuat ulang PM2, lalu memastikan situsnya benar-benar menjawab.
+**mencadangkan database lalu menerapkan migrasi**, membangun, memuat ulang PM2, lalu
+memastikan situsnya benar-benar menjawab.
 
 **Jangan menjalankan langkahnya satu per satu dari ingatan** — urutannya
 mengandung satu jebakan yang pernah menjatuhkan produksi, dan skrip itu ada
@@ -1001,11 +1170,21 @@ dependensi dengan `NODE_ENV=development npm ci --include=dev`, dan baru memuat
 2. **Restart yang tidak sehat berisik.** Sesudah `pm2 restart`, skrip menunggu
    sampai 20 detik dan keluar dengan kode bukan-nol kalau `/dashboard/login`
    tidak menjawab 200 — kebalikan dari kegagalan senyap yang pernah terjadi.
+3. **Migrasi gagal tidak membongkar apa pun.** Migrasi berjalan **sebelum** build,
+   dan didahului satu cadangan database. Kalau ia gagal, `.next` belum disentuh dan
+   PM2 belum di-restart, jadi versi lama terus melayani seperti biasa.
+
+**Migrasi tidak boleh dilupakan.** Kode yang menyebut kolom atau tabel baru akan
+menjatuhkan setiap halaman yang menyentuhnya kalau skemanya belum ikut naik. Karena
+itu langkahnya ada di dalam skrip (`npm run db:setup`), bukan di catatan terpisah —
+dan `tsx` dipasang sebagai devDependency supaya langkah itu tidak bergantung pada
+unduhan `npx` saat deploy.
 
 ### Kalau ada yang salah
 
 | Gejala | Periksa |
 |---|---|
+| Skrip berhenti di "Migrasi GAGAL" | Galat migrasi ada di keluarannya. Belum ada yang dibongkar; cadangan sebelum migrasi ada di `/srv/enterprise-backup` |
 | Skrip berhenti di "Build GAGAL" | Galat build ada di keluarannya. Situs masih hidup dengan versi lama; perbaiki kodenya, dorong, jalankan lagi |
 | Skrip berhenti di "TIDAK SEHAT" | `pm2 logs enterprise --err --lines 30` |
 | Halaman terbuka tapi tanpa gaya (CSS hilang) | `APP_BASE_PATH` saat build berbeda dari `location` nginx |
@@ -1090,7 +1269,7 @@ Catatan: Autentikasi dasar (login sederhana) akan dikembangkan lebih awal untuk 
 ### Untuk Fitur Timeline Proyek
 
 1. Pengguna dapat mengakses halaman timeline/Gantt dari dashboard utama.
-2. Timeline menampilkan semua proyek dalam bentuk bar horizontal sesuai rentang tanggal mulai dan tenggat.
+2. Timeline menampilkan proyek dalam bentuk bar horizontal sesuai rentang tanggal mulai dan tenggat. **Bawaannya hanya proyek yang sudah berjalan** (`Berjalan` dan `Tertunda` — yang diparkir tetap pekerjaan yang sudah dimulai), karena itulah yang paling sering dicari. Dua sakelar di atas grafik menyalakan yang **akan berjalan** (`Prospect`/`Penawaran`/`Negosiasi`) dan yang **selesai**, dan jumlah proyek yang sedang disembunyikan ditulis apa adanya — penyaring yang menyembunyikan tanpa memberi tahu membuat orang mengira datanya hilang.
 3. Proyek yang saling tumpang tindih (overlap) secara visual terlihat jelas dan diberi warna berbeda.
 4. Pengguna dapat memfilter timeline berdasarkan status, prioritas, jenis proyek, atau anggota tertentu.
 5. Sistem memberikan indikasi proyek yang memiliki potential bentrok jadwal dengan menampilkan jumlah tumpang tindih dalam periode tertentu.

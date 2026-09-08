@@ -5,7 +5,20 @@
 import assert from "node:assert/strict";
 import {
   addProgress,
+  applyTemplateToProject,
+  createActivityTemplate,
   createProject,
+  createProjectActivity,
+  deleteActivityTemplate,
+  deleteProjectActivity,
+  getActivityTemplates,
+  getCurvaS,
+  getProjectActivities,
+  getProjectActivity,
+  setActivityDone,
+  setProgressMode,
+  updateActivityTemplate,
+  updateProjectActivity,
   deleteAgendaEntries,
   moveAgendaEntries,
   createPlan,
@@ -940,6 +953,151 @@ async function main() {
   assert.equal((await getPlanProspects(rencanaUji.id)).length, 0);
   assert.equal((await getPlans()).length, rencanaSemula);
   assert.equal((await getProjects()).length, semua.length, "proyeknya tidak ikut terhapus");
+
+
+  /* --- Checklist aktivitas dan kurva S -------------------------------------- */
+
+  // Dibaca segar, bukan dari snapshot `semua` di awal: bagian-bagian sebelumnya
+  // sudah menyentuh sebagian proyek.
+  const proyekAktif = (await getProjects()).find((p) => p.status === "Berjalan")!;
+  const aktivitas = await getProjectActivities(proyekAktif.id);
+  assert.ok(aktivitas.length > 0, "seed membekali proyek contoh dengan checklist");
+  assert.deepEqual(
+    aktivitas.map((a) => a.sortOrder),
+    [...aktivitas.map((a) => a.sortOrder)].sort((x, y) => x - y),
+    "aktivitas keluar menurut urutannya"
+  );
+  assert.equal(proyekAktif.progressMode, "manual", "proyek contoh masuk terkunci manual");
+
+  // MODE MANUAL MENAHAN. Mencentang tetap tercatat pada aktivitasnya, tapi
+  // angka progres dan riwayatnya tidak bergeser sedikit pun.
+  const belum = aktivitas.find((a) => a.doneDate === null)!;
+  const riwayatSemula = (await getProgressHistory(proyekAktif.id)).length;
+  const dicentang = await setActivityDone(belum.id, true, 1, "2026-09-08");
+  assert.equal(dicentang.ok, true);
+  assert.equal((await getProjectActivity(belum.id))!.doneDate, "2026-09-08");
+  assert.equal((await getProject(proyekAktif.id))!.progressPct, proyekAktif.progressPct);
+  assert.equal((await getProject(proyekAktif.id))!.status, proyekAktif.status);
+  assert.equal((await getProgressHistory(proyekAktif.id)).length, riwayatSemula);
+
+  // Melepas centang lagi supaya bagian berikutnya berangkat dari keadaan semula.
+  await setActivityDone(belum.id, false, 1);
+  assert.equal((await getProjectActivity(belum.id))!.doneDate, null);
+
+  // BERALIH KE AUTO langsung menghitung ulang: membiarkan angka lama bertahan
+  // sesudah kuncinya dilepas akan menampilkan progres yang tidak dijamin siapa pun.
+  await setProgressMode(proyekAktif.id, "auto");
+  const sesudahAuto = (await getProject(proyekAktif.id))!;
+  const bobotSelesai = (await getProjectActivities(proyekAktif.id))
+    .filter((a) => a.doneDate !== null)
+    .reduce((n, a) => n + a.weight, 0);
+  const bobotTotal = (await getProjectActivities(proyekAktif.id)).reduce((n, a) => n + a.weight, 0);
+  assert.equal(sesudahAuto.progressPct, Math.round((bobotSelesai / bobotTotal) * 100));
+
+  // MENCENTANG DI MODE AUTO menggerakkan progres, status, dan riwayat sekaligus.
+  const berikutnya = (await getProjectActivities(proyekAktif.id)).find((a) => a.doneDate === null)!;
+  const riwayatAuto = (await getProgressHistory(proyekAktif.id)).length;
+  await setActivityDone(berikutnya.id, true, 1, "2026-09-08");
+  const sesudahCentang = (await getProject(proyekAktif.id))!;
+  assert.equal(
+    sesudahCentang.progressPct,
+    Math.round(((bobotSelesai + berikutnya.weight) / bobotTotal) * 100),
+    "progres bertambah persis sebesar bobotnya"
+  );
+  assert.equal(sesudahCentang.status, berikutnya.status, "status ikut berpindah");
+  assert.equal(
+    (await getProgressHistory(proyekAktif.id)).length,
+    riwayatAuto + 1,
+    "satu baris riwayat tercatat"
+  );
+  assert.match((await getProgressHistory(proyekAktif.id))[0].note, new RegExp(berikutnya.name));
+
+  // Menambah, mengubah, dan menghapus aktivitas ikut menghitung ulang.
+  const tambahan = (await createProjectActivity(proyekAktif.id, {
+    name: "Serah terima tambahan",
+    weight: 10,
+    status: "Selesai",
+    slaDays: null,
+    targetDate: "2026-10-01",
+    doneDate: null,
+    doneBy: null,
+  }))!;
+  assert.equal(tambahan.sortOrder, aktivitas.length, "masuk di urutan paling belakang");
+  assert.ok(
+    (await getProject(proyekAktif.id))!.progressPct < sesudahCentang.progressPct,
+    "pembagi bertambah, jadi persentasenya turun"
+  );
+  await updateProjectActivity(tambahan.id, { ...tambahan, weight: 20 });
+  assert.equal((await getProjectActivity(tambahan.id))!.weight, 20);
+  assert.equal(await deleteProjectActivity(tambahan.id), true);
+  assert.equal(await deleteProjectActivity(tambahan.id), false);
+  assert.equal((await getProject(proyekAktif.id))!.progressPct, sesudahCentang.progressPct);
+
+  // Kurva S: garis aktual berhenti di hari acuan, rencana proyekKosong tanpa target.
+  const kurva = await getCurvaS(proyekAktif.id, "2026-09-08");
+  assert.ok(kurva.titik.length > 0);
+  assert.ok(
+    kurva.titik.every((t) => t.rencana === null),
+    "aktivitas hasil salinan belum punya tanggal target"
+  );
+  assert.equal(kurva.selisih, null, "tanpa rencana tidak ada selisih yang jujur");
+  assert.equal(kurva.totalBobot, bobotTotal);
+  assert.ok(kurva.titik.filter((t) => t.date > "2026-09-08").every((t) => t.aktual === null));
+
+  // Template hanya boleh disalin ke proyek yang daftarnya masih proyekKosong.
+  const sudahIsi = await applyTemplateToProject(proyekAktif.id);
+  assert.equal(sudahIsi.ok, false);
+
+  const proyekKosong = await createProject({
+    ...proyekAktif,
+    name: "Uji salin template",
+  });
+  for (const a of await getProjectActivities(proyekKosong.id)) await deleteProjectActivity(a.id);
+  const disalin = await applyTemplateToProject(proyekKosong.id);
+  assert.equal(disalin.ok, true);
+  assert.equal(
+    (await getProjectActivities(proyekKosong.id)).length,
+    (await getActivityTemplates(proyekAktif.type)).length
+  );
+  // Salinan berdiri sendiri: tidak satu pun sudah tercentang.
+  assert.ok((await getProjectActivities(proyekKosong.id)).every((a) => a.doneDate === null));
+  assert.equal(await deleteProject(proyekKosong.id), true);
+
+  // CRUD template. Mengubah template TIDAK menggeser proyek yang sudah proyekAktif.
+  const progresSebelumTemplate = (await getProject(proyekAktif.id))!.progressPct;
+  const templateBaru = await createActivityTemplate(proyekAktif.type, {
+    name: "Langkah percobaan",
+    weight: 50,
+    status: "Berjalan",
+    slaDays: 3,
+  });
+  assert.equal((await getProject(proyekAktif.id))!.progressPct, progresSebelumTemplate);
+  assert.equal(
+    (await updateActivityTemplate(templateBaru.id, {
+      ...templateBaru,
+      name: "Langkah percobaan (diubah)",
+    }))!.name,
+    "Langkah percobaan (diubah)"
+  );
+  assert.equal(await deleteActivityTemplate(templateBaru.id), true);
+  assert.equal(await deleteActivityTemplate(templateBaru.id), false);
+  assert.equal(await updateActivityTemplate(999_999, { ...templateBaru }), null);
+
+  // Proyek yang tidak ada tidak pernah membuat aktivitas menggantung.
+  assert.equal(
+    await createProjectActivity(999_999, {
+      name: "Tidak boleh ada",
+      weight: 10,
+      status: "Berjalan",
+      slaDays: null,
+      targetDate: null,
+      doneDate: null,
+      doneBy: null,
+    }),
+    null
+  );
+  assert.equal((await setActivityDone(999_999, true, 1)).ok, false);
+  assert.equal(await setProgressMode(999_999, "auto"), null);
 
   console.log("ok: api");
 }
