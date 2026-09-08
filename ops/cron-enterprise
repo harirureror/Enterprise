@@ -1,0 +1,17 @@
+# /etc/cron.d/enterprise — Dashboard Enterprise
+#
+# Server berjalan di UTC; jam di bawah ditulis UTC dengan padanan WIB (UTC+7)
+# di komentarnya, supaya tidak perlu dihitung ulang tiap kali dibaca.
+#
+# Keluaran diarahkan ke berkas log, bukan ke email: mesin ini tidak punya MTA,
+# jadi keluaran cron yang tidak diarahkan akan hilang tanpa jejak.
+
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Pengingat terjadwal (F12). Sekali sehari, 08:00 WIB.
+# Aman diulang: setelah jalan, nextAt sudah melewati hari ini.
+0 1 * * * root /srv/enterprise-dashboard/cron-pengingat.sh >> /var/log/enterprise-cron.log 2>&1
+
+# Cadangan database. Sekali sehari, 03:00 WIB — jam paling sepi.
+0 20 * * * root /srv/enterprise-dashboard/backup-db.sh >> /var/log/enterprise-cron.log 2>&1

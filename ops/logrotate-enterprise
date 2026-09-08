@@ -1,0 +1,11 @@
+# Log cron dashboard. Tanpa ini berkasnya tumbuh selamanya — pelan, tapi tidak
+# pernah berhenti.
+/var/log/enterprise-cron.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 root root
+}
