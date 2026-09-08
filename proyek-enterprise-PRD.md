@@ -1199,7 +1199,7 @@ unduhan `npx` saat deploy.
 
 | Gejala | Periksa |
 |---|---|
-| Halaman proyek 500 padahal login 200 | Skemanya tertinggal di belakang kode. Jalankan ulang `deploy.sh`; kalau perlu manual: `set -a; . ./.env.production; set +a; npm run db:setup; pm2 restart enterprise` |
+| Halaman proyek 500 padahal login 200 | Skemanya tertinggal di belakang kode. **Jalankan ulang `deploy.sh`** — jangan menyusun perintah manual sendiri; lihat catatan di bawah tabel |
 | Skrip berhenti di "Migrasi GAGAL" | Galat migrasi ada di keluarannya. Belum ada yang dibongkar; cadangan sebelum migrasi ada di `/srv/enterprise-backup` |
 | Skrip berhenti di "Build GAGAL" | Galat build ada di keluarannya. Situs masih hidup dengan versi lama; perbaiki kodenya, dorong, jalankan lagi |
 | Skrip berhenti di "TIDAK SEHAT" | `pm2 logs enterprise --err --lines 30` |
@@ -1207,6 +1207,23 @@ unduhan `npx` saat deploy.
 | Login berputar tanpa berhasil | Mode SSL Cloudflare masih Flexible |
 | Situs tidak terbuka sama sekali | Rekaman DNS berubah jadi DNS-only (awan abu-abu) |
 | `ERR_UNKNOWN_BUILTIN_MODULE` | Build memakai Node sistem (v20), bukan `node24` |
+
+**Perintah manual di server wajib menyetel PATH ke `node24` lebih dulu.** `node`
+apa adanya di mesin itu adalah **v20**, dan `node:sqlite` baru ada sejak Node 22.5.
+Menjalankan `npm run db:setup` begitu saja berhenti di
+`ERR_UNKNOWN_BUILTIN_MODULE: No such built-in module: node:sqlite` — dan itu terjadi
+**sesudah** cadangan dibuat, jadi sekilas tampak seperti langkah yang setengah
+berjalan. Bentuk lengkapnya:
+
+```bash
+cd /srv/enterprise-dashboard
+export PATH="$(dirname "$(readlink -f /usr/local/bin/node24)"):$PATH"
+set -a; . ./.env.production; set +a
+npm run db:setup && pm2 restart enterprise
+```
+
+`deploy.sh` sudah melakukan ketiga baris pertama itu sendiri, jadi menjalankan ulang
+skripnya tetap jalan yang paling aman.
 
 ### Tugas terjadwal
 
